@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block title %}Cardápio{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Cardápio</h1>
+  <a class="btn btn-yellow" href="{{ url_for('admin.product_form') }}">+ Novo produto</a>
+</div>
+{% for c in cats %}
+<section class="panel">
+  <h2>{{ c.name }}{% if not c.active %} <span class="badge red">categoria oculta</span>{% endif %}</h2>
+  {% if by_cat[c.id] %}
+  <div class="table-wrap">
+    <table class="list">
+      <thead><tr><th></th><th>Produto</th><th>Preço</th><th>Ingredientes</th><th>Molho</th><th>Situação</th><th></th></tr></thead>
+      <tbody>
+      {% for p in by_cat[c.id] %}
+        <tr class="{{ '' if p.active else 'off' }}">
+          <td>{% if p.image %}<img class="thumb-sm" src="{{ url_for('public.upload', name=p.image) }}" alt="">{% endif %}</td>
+          <td><strong>{% if p.featured %}⭐ {% endif %}{{ p.name }}</strong>{% if p.old_price_cents %} <span class="badge red">promo</span>{% endif %}<br><span class="small muted">{{ p.description }}</span></td>
+          <td>{{ p.price_cents|brl }}</td>
+          <td>{{ p.n_ing }}</td>
+          <td>{{ "Sim" if p.allows_sauces else "—" }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.product_toggle', product_id=p.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="pill store-toggle {{ 'pill-open' if p.active else 'pill-closed' }}" type="submit" title="Clique para {{ 'pausar' if p.active else 'ativar' }}">{{ "À venda" if p.active else "Pausado" }}</button>
+            </form>
+          </td>
+          <td><a class="btn btn-dark btn-sm" href="{{ url_for('admin.product_form', product_id=p.id) }}">Editar</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Nenhum produto nesta categoria.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

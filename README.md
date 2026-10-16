@@ -1,0 +1,81 @@
+# NuMelhor Delivery
+
+Site de pedidos da NuMelhor Lanches (Av. Luiz Lazzarin, 155, Rio Maina, Criciúma/SC). Feito para ser simples até para quem tem pouca prática com celular: letras grandes, botões grandes e escritos, e poucos passos. Funciona de 320px (celular pequeno) até telas grandes.
+
+- **Cardápio real da loja:** xis, hambúrgueres, pastéis (salgados, especiais e doces), porções, combos e bebidas, com busca e destaques.
+- **Montar o lanche:**
+  - adicionais pagos;
+  - xis "aberto no prato";
+  - sabor do refri e do suco;
+  - tirar ingredientes;
+  - molhos (sachês).
+- **Entrega ou retirada:** o local de entrega é marcado no mapa e a taxa é calculada pela distância.
+- **Pagamento:** pelo site (Pix e cartão via Mercado Pago) ou na entrega/retirada (dinheiro com troco, Pix, débito, crédito).
+- **WhatsApp:** o pedido vai para o WhatsApp da loja com um link para confirmar no painel.
+- **"Meus pedidos":** mostra o status de cada pedido e tem o botão "Pedir de novo".
+- **Horário automático:** a loja abre e fecha sozinha ("Fechado · abre hoje às 18h").
+- **Painel do dono:**
+  - pedidos em tempo real com alerta sonoro;
+  - cardápio, opções e fotos;
+  - horários, taxa de entrega e pagamentos;
+  - segurança e 2FA.
+- **SEO:**
+  - título e descrição;
+  - imagem de compartilhamento (WhatsApp/Instagram);
+  - dados estruturados para o Google (restaurante, endereço, horário e cardápio com preços);
+  - `sitemap.xml` e `robots.txt`;
+  - instalável na tela inicial (PWA).
+- **LGPD:** página `/privacidade`.
+
+## Rodar no computador
+
+```bash
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+copy .env.example .env      # preencha SECRET_KEY
+.venv\Scripts\python -m flask --app run criar-admin dono
+.venv\Scripts\python run.py
+```
+
+- Site: http://127.0.0.1:5000
+- Painel: http://127.0.0.1:5000/admin. A senha temporária aparece no comando `criar-admin` e precisa ser trocada no primeiro acesso.
+
+Para voltar ao cardápio padrão da loja (os pedidos antigos são mantidos), use `flask --app run recarregar-cardapio`.
+
+## Publicar (Render + GitHub)
+
+1. Suba este repositório no GitHub como **privado**.
+2. No [Render](https://render.com), escolha **New → Blueprint** e aponte para o repositório. O arquivo `render.yaml` já configura tudo.
+3. Preencha no Render:
+   - `PUBLIC_BASE_URL`: o endereço https que o Render der, ou o domínio próprio.
+   - `ADMIN_PASSWORD`: senha inicial do painel, com 12 ou mais caracteres. Ela é trocada no 1º acesso.
+4. Acesse `/admin`, entre com `dono` e a senha inicial, crie a senha definitiva e ative o 2FA em **Segurança**.
+
+> No plano grátis do Render os dados (pedidos e configurações) **são apagados a cada reinício ou nova publicação**. Serve para demonstração. Para uso real, use um plano com disco permanente ou um servidor próprio, apontando `DATABASE_PATH` e `UPLOAD_DIR` para o disco, e faça backup diário.
+
+## Pagamentos (Mercado Pago)
+
+No painel, menu **Pagamentos**, tem o passo a passo completo:
+1. criar a conta;
+2. cadastrar a chave Pix nela;
+3. criar a aplicação;
+4. colar o Access Token (teste e depois produção);
+5. configurar o webhook.
+
+Sem conta conectada, o site fica em **modo simulação**, sem nenhum dinheiro real.
+
+## Segurança
+
+- Preços, taxa de entrega e total são calculados **só no servidor**. O navegador manda apenas os IDs.
+- Dados de cartão nunca passam pelo site: o cartão é digitado na página do Mercado Pago.
+- Um pagamento só é aceito depois de consultado na API do Mercado Pago (confere o pedido e o valor). O webhook tem a assinatura validada.
+- O token do Mercado Pago fica **criptografado** no banco (chave derivada do `SECRET_KEY`). Trocar a conta exige senha, e em produção também o 2FA. Toda troca fica no registro de segurança.
+- Painel do dono:
+  - senha forte e troca obrigatória no 1º acesso;
+  - 2FA;
+  - bloqueio após várias tentativas erradas;
+  - sessão expira se ficar parada;
+  - botão "sair de todos os aparelhos".
+- Proteção contra formulários forjados (CSRF), cabeçalhos de segurança (CSP, HSTS, anti-iframe), limite de pedidos por aparelho e validação das fotos enviadas.
+- `.env` e `instance/` (banco, fotos enviadas) **não vão para o Git**.
+- Verificado com `bandit` (análise do código) e `pip-audit` (bibliotecas com falhas conhecidas): nenhum problema.

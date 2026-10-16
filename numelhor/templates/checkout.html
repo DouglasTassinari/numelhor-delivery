@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block title %}Finalizar pedido — {{ cfg.store_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+{% block content %}
+<div class="container">
+  <a class="back" href="{{ url_for('public.index') }}?sacola=1">← Voltar e mudar a sacola</a>
+  <h1 class="page-title">Finalizar pedido</h1>
+
+  {% if not store_open %}
+  <div class="alert alert-error">{{ store_status.label }}. Horários: {{ hours_summary }}.</div>
+  {% endif %}
+
+  <div id="empty-cart" class="panel empty" hidden>
+    <img src="{{ url_for('static', filename='img/que-gatuuu.webp') }}" alt="">
+    <p>Sua sacola está vazia.</p>
+    <a class="btn btn-yellow" href="{{ url_for('public.index') }}#cardapio">Ver cardápio</a>
+  </div>
+
+  <div class="checkout-grid" id="checkout">
+    <form id="checkout-form" novalidate>
+      <section class="panel">
+        <h2><span class="step">1</span> Seus dados</h2>
+        <div class="field">
+          <label for="name">Nome</label>
+          <input type="text" id="name" name="name" autocomplete="name" maxlength="60" required placeholder="Como te chamamos?">
+        </div>
+        <div class="field">
+          <label for="phone">WhatsApp</label>
+          <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="tel" maxlength="20" required placeholder="(48) 99999-9999">
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2><span class="step">2</span> Como você quer receber?</h2>
+        <div class="seg">
+          <label class="option"><input type="radio" name="fulfillment" value="entrega"><span class="box"><strong>🛵 Entrega</strong><span>{{ cfg.delivery_eta }} · taxa pelo endereço</span></span></label>
+          <label class="option"><input type="radio" name="fulfillment" value="retirada"><span class="box"><strong>🏪 Retirar na loja</strong><span>{{ cfg.pickup_eta }} · sem taxa</span></span></label>
+        </div>
+
+        <div id="pickup-box" class="sub-box" hidden>
+          <div class="alert alert-info">Retirada em: <strong>{{ cfg.store_address }} — {{ cfg.store_city }}</strong></div>
+        </div>
+
+        <div id="delivery-box" class="sub-box" hidden>
+          <div class="field">
+            <label for="addr-search">Buscar endereço</label>
+            <div class="search-wrap">
+              <input type="text" id="addr-search" autocomplete="off" placeholder="Digite a rua e o número" aria-controls="addr-results">
+              <ul id="addr-results" class="results" role="listbox" hidden></ul>
+            </div>
+          </div>
+          <div class="map-tools">
+            <button type="button" class="btn btn-dark btn-sm" id="use-location">📍 Usar minha localização</button>
+          </div>
+          <div id="map" class="map" aria-label="Mapa para marcar o local de entrega"></div>
+          <p class="hint">Confira o pino 📍 e arraste até a porta, se precisar. É esse ponto que o motoboy vai usar.</p>
+          <div class="row2">
+            <div class="field">
+              <label for="address">Rua / Bairro</label>
+              <input type="text" id="address" name="address" maxlength="160" autocomplete="street-address">
+            </div>
+            <div class="field">
+              <label for="number">Número</label>
+              <input type="text" id="number" name="number" maxlength="12" inputmode="numeric">
+            </div>
+          </div>
+          <div class="row-even">
+            <div class="field">
+              <label for="complement">Complemento <span class="opt">(opcional)</span></label>
+              <input type="text" id="complement" name="complement" maxlength="80" placeholder="Apto, bloco, casa dos fundos…">
+            </div>
+            <div class="field">
+              <label for="reference">Ponto de referência <span class="opt">(opcional)</span></label>
+              <input type="text" id="reference" name="reference" maxlength="120" placeholder="Perto do mercado…">
+            </div>
+          </div>
+          <div id="delivery-quote" class="quote" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2><span class="step">3</span> Pagamento</h2>
+        <div class="seg">
+          <label class="option"><input type="radio" name="pay_when" value="online"><span class="box"><strong>💳 Pagar agora</strong><span>Pix ou cartão pelo site</span></span></label>
+          <label class="option"><input type="radio" name="pay_when" value="entrega"><span class="box"><strong id="offline-title">🤝 Pagar na entrega</strong><span>Dinheiro, Pix ou cartão</span></span></label>
+        </div>
+
+        <div id="pay-online" class="sub-box" hidden>
+          <div class="seg">
+            <label class="option"><input type="radio" name="online_method" value="pix"><span class="box"><strong>Pix</strong><span>QR Code na hora, aprovação imediata</span></span></label>
+            <label class="option"><input type="radio" name="online_method" value="cartao"><span class="box"><strong>Cartão</strong><span>Crédito ou débito</span></span></label>
+          </div>
+          <div class="field sub-box" id="email-field" hidden>
+            <label for="email">E-mail <span class="opt">(opcional, para o comprovante)</span></label>
+            <input type="email" id="email" name="email" maxlength="120" autocomplete="email">
+          </div>
+          <p class="secure-note">🔒 O pagamento é processado pelo Mercado Pago. Os dados do seu cartão não passam pelo nosso site.</p>
+          {% if simulation %}<span class="test-badge">MODO TESTE — nenhum valor real será cobrado</span>{% endif %}
+        </div>
+
+        <div id="pay-offline" class="sub-box" hidden>
+          <div class="seg">
+            <label class="option"><input type="radio" name="offline_method" value="dinheiro"><span class="box"><strong>💵 Dinheiro</strong></span></label>
+            <label class="option"><input type="radio" name="offline_method" value="pix"><span class="box"><strong>Pix</strong></span></label>
+            <label class="option"><input type="radio" name="offline_method" value="debito"><span class="box"><strong>Débito</strong></span></label>
+            <label class="option"><input type="radio" name="offline_method" value="credito"><span class="box"><strong>Crédito</strong></span></label>
+          </div>
+          <div class="field sub-box" id="change-field" hidden>
+            <label for="change_for">Troco para quanto? <span class="opt">(deixe vazio se não precisar)</span></label>
+            <input type="text" id="change_for" name="change_for" inputmode="decimal" maxlength="10" placeholder="Ex.: 100">
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2><span class="step">4</span> Observações</h2>
+        <div class="field">
+          <label for="notes" class="sr-only">Observações do pedido</label>
+          <textarea id="notes" name="notes" maxlength="300" placeholder="Alguma coisa que a gente precisa saber? (opcional)"></textarea>
+        </div>
+      </section>
+    </form>
+
+    <aside class="panel summary" aria-labelledby="sum-title">
+      <h2 id="sum-title">Seu pedido</h2>
+      <div id="summary-lines"></div>
+      <div class="totals">
+        <div><span>Subtotal</span><span id="sum-subtotal">—</span></div>
+        <div id="sum-fee-row" hidden><span>Entrega</span><span id="sum-fee">—</span></div>
+        <div class="grand"><span>Total</span><span id="sum-total">—</span></div>
+      </div>
+      <div id="form-error" class="alert alert-error" role="alert" hidden></div>
+      <button type="submit" form="checkout-form" class="btn btn-yellow btn-lg btn-block" id="submit-btn" {% if not store_open %}disabled{% endif %}>Fazer pedido</button>
+      <p class="hint" style="margin-top:12px">Ao confirmar, o pedido entra direto no sistema da loja. Depois é só tocar em "Enviar no WhatsApp".<br>Seus dados são usados só para o pedido. <a href="{{ url_for('public.privacy') }}" target="_blank" rel="noopener">Privacidade</a></p>
+    </aside>
+  </div>
+</div>
+<script type="application/json" id="checkout-data">{{ {"store": store, "open": store_open}|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
+{% endblock %}

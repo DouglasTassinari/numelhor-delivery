@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import wa_icon %}
+{% block title %}Pedido #{{ order.id }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">{% endblock %}
+{% block content %}
+{% set badge = "yellow" if order.status in ("novo", "aguardando_pagamento") else ("red" if order.status == "cancelado" else "green") %}
+<a class="back" href="{{ url_for('admin.orders') }}" style="margin-top:0">← Pedidos</a>
+<div class="order-head">
+  <h1>Pedido #{{ order.id }}</h1>
+  <span class="badge {{ badge }}">{{ status_label }}</span>
+  <span class="badge {{ 'green' if order.payment_status == 'pago' else '' }}">{{ payment_label }}</span>
+  <span class="muted small">{{ "🛵 Entrega" if order.fulfillment == "entrega" else "🏪 Retirada" }}</span>
+</div>
+
+<div class="order-grid">
+  <div>
+    {% if actions %}
+    <section class="panel">
+      <h2>Próximo passo</h2>
+      <div class="actions">
+        {% for value, label in actions %}
+        <form method="post" action="{{ url_for('admin.order_status', order_id=order.id) }}"
+              {% if value == 'cancelado' %}data-confirm="Cancelar o pedido #{{ order.id }}?{% if order.payment_status == 'pago' %} Ele já foi PAGO pelo site: lembre de devolver o valor no Mercado Pago.{% endif %}"{% endif %}>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="status" value="{{ value }}">
+          <button type="submit" class="btn {{ 'btn-danger' if value == 'cancelado' else ('btn-yellow btn-lg' if loop.first else 'btn-dark btn-lg') }}">{{ label }}</button>
+        </form>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>WhatsApp</h2>
+      <div class="actions">
+        <a class="btn btn-wa" href="{{ customer_wa }}" target="_blank" rel="noopener">{{ wa_icon() }} Avisar cliente: “{{ status_label }}”</a>
+        {% if courier_wa %}<a class="btn btn-dark" href="{{ courier_wa }}" target="_blank" rel="noopener">🛵 Mandar pro motoboy</a>{% endif %}
+      </div>
+      <p class="hint" style="margin-top:10px">Abre o WhatsApp com a mensagem pronta. É só escolher o contato (motoboy) e enviar.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Itens</h2>
+      {% for it in items %}
+      <div class="item-row">
+        <div class="t"><span>{{ it.qty }}x {{ it.name }}</span><span>{{ it.line_total_cents|brl }}</span></div>
+        {% for g, names in it.options|group_options %}<div>➕ <strong>{{ g }}:</strong> {{ names }}</div>{% endfor %}
+        {% if it.removed %}<div class="big-sem">❌ SEM: {{ it.removed|join(", ") }}</div>{% endif %}
+        {% if it.sauces %}<div>🥫 Molhos: {{ it.sauces|map(attribute="name")|join(", ") }}</div>{% endif %}
+        {% if it.notes %}<div class="muted">📝 {{ it.notes }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      <div class="totals" style="padding:12px 0 0">
+        <div><span>Subtotal</span><span>{{ order.subtotal_cents|brl }}</span></div>
+        {% if order.fulfillment == "entrega" %}<div><span>Entrega</span><span>{{ order.delivery_fee_cents|brl }}</span></div>{% endif %}
+        <div class="grand"><span>Total</span><span>{{ order.total_cents|brl }}</span></div>
+      </div>
+      {% if order.notes %}<div class="alert alert-info">📝 {{ order.notes }}</div>{% endif %}
+    </section>
+  </div>
+
+  <div>
+    <section class="panel">
+      <h2>Cliente</h2>
+      <dl class="kv">
+        <dt>Nome</dt><dd>{{ order.customer_name }}</dd>
+        <dt>WhatsApp</dt><dd><a href="https://wa.me/{{ '55' ~ order.customer_phone if order.customer_phone|length <= 11 else order.customer_phone }}" target="_blank" rel="noopener">{{ order.customer_phone }}</a></dd>
+        {% if order.customer_email %}<dt>E-mail</dt><dd>{{ order.customer_email }}</dd>{% endif %}
+      </dl>
+    </section>
+
+    {% if order.fulfillment == "entrega" %}
+    <section class="panel">
+      <h2>Entrega</h2>
+      <dl class="kv">
+        <dt>Endereço</dt><dd>{{ order.address }}, nº {{ order.address_number }}</dd>
+        {% if order.complement %}<dt>Compl.</dt><dd>{{ order.complement }}</dd>{% endif %}
+        {% if order.reference %}<dt>Referência</dt><dd>{{ order.reference }}</dd>{% endif %}
+        <dt>Distância</dt><dd>≈ {{ "%.1f"|format(order.distance_km) }} km</dd>
+      </dl>
+      <div class="mini-map" id="mini-map" data-lat="{{ order.lat }}" data-lng="{{ order.lng }}"></div>
+      <a class="btn btn-yellow btn-block" href="{{ maps_url }}" target="_blank" rel="noopener">📍 Abrir no Google Maps</a>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Pagamento</h2>
+      <dl class="kv">
+        <dt>Forma</dt><dd>{{ method_label }} {{ "pelo site" if order.pay_when == "online" else ("na entrega" if order.fulfillment == "entrega" else "na retirada") }}</dd>
+        <dt>Situação</dt><dd>{{ payment_label }}</dd>
+        {% if order.change_for_cents %}<dt>Troco</dt><dd>para {{ order.change_for_cents|brl }} → levar <strong>{{ (order.change_for_cents - order.total_cents)|brl }}</strong></dd>{% endif %}
+        {% if order.payment_ref and order.pay_when == "online" %}<dt>Referência</dt><dd class="small">{{ order.payment_ref }}</dd>{% endif %}
+      </dl>
+      {% if pix_charge %}
+      <div class="sub-box">
+        <p class="label">QR Pix para cobrar {{ order.total_cents|brl }} na {{ "entrega" if order.fulfillment == "entrega" else "retirada" }}</p>
+        <img class="qr-white" src="data:image/png;base64,{{ pix_charge.qr }}" alt="QR Code Pix">
+        <p class="hint">Confira no app do banco se o dinheiro caiu antes de liberar o pedido: esse QR não confirma sozinho.</p>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>{% endblock %}

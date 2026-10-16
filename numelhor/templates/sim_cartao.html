@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block title %}Simulador de cartão — {{ cfg.store_name }}{% endblock %}
+{% block content %}
+<div class="container" style="max-width:560px;padding-top:30px;padding-bottom:60px">
+  <section class="panel">
+    <span class="test-badge">MODO TESTE — simulação do Mercado Pago</span>
+    <h1 class="page-title" style="margin-top:14px">Pagamento com cartão</h1>
+    <p class="muted">Na versão real, aqui abre a página segura do Mercado Pago, onde o cliente digita o cartão. Nosso site nunca vê esses dados.</p>
+    <dl class="kv" style="margin:18px 0">
+      <dt>Pedido</dt><dd>#{{ order.id }}</dd>
+      <dt>Valor</dt><dd><strong>{{ order.total_cents|brl }}</strong></dd>
+    </dl>
+    <form method="post" action="{{ url_for('public.sim_action', token=order.token, action='aprovar') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-yellow btn-lg btn-block" type="submit">✔ Simular pagamento aprovado</button>
+    </form>
+    <form method="post" action="{{ url_for('public.sim_action', token=order.token, action='recusar') }}" style="margin-top:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-danger btn-block" type="submit">✕ Simular cartão recusado</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

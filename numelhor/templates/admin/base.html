@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Painel{% endblock %} — NuMelhor</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% if active %}
+  <header class="admin-top">
+    <a class="admin-brand" href="{{ url_for('admin.orders') }}">
+      <img src="{{ url_for('static', filename='img/logo.webp') }}" alt="" width="44" height="44">
+      <span>Nu<span class="y">Melhor</span> <small>Painel</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="status {{ 'open' if store_open else 'closed' }}">{{ store_status.label }}</span>
+      <form method="post" action="{{ url_for('admin.store_mode') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="back" value="{{ request.path }}">
+        {% if store_status.mode == "auto" and store_open %}
+          <button class="btn btn-sm btn-danger" name="mode" value="fechado">Fechar agora</button>
+        {% elif store_status.mode == "auto" %}
+          <button class="btn btn-sm btn-yellow" name="mode" value="aberto">Abrir agora</button>
+        {% else %}
+          <button class="btn btn-sm btn-yellow" name="mode" value="auto">Voltar ao horário normal</button>
+        {% endif %}
+      </form>
+      <form method="post" action="{{ url_for('admin.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-ghost btn-sm">Sair</button>
+      </form>
+    </div>
+  </header>
+  <nav class="admin-nav" aria-label="Painel">
+    <a href="{{ url_for('admin.orders') }}" class="{{ 'on' if active == 'pedidos' }}">📋 Pedidos</a>
+    <a href="{{ url_for('admin.products') }}" class="{{ 'on' if active == 'cardapio' }}">🍔 Cardápio</a>
+    <a href="{{ url_for('admin.extras') }}" class="{{ 'on' if active == 'extras' }}">🥫 Categorias e molhos</a>
+    <a href="{{ url_for('admin.payments_page') }}" class="{{ 'on' if active == 'pagamentos' }}">💳 Pagamentos</a>
+    <a href="{{ url_for('admin.config') }}" class="{{ 'on' if active == 'config' }}">⚙️ Configurações</a>
+    <a href="{{ url_for('admin.security_page') }}" class="{{ 'on' if active == 'seguranca' }}">🔒 Segurança</a>
+    <a href="{{ url_for('public.index') }}" class="site" target="_blank" rel="noopener">Ver site ↗</a>
+  </nav>
+  <main class="container admin-main">
+    {% with messages = get_flashed_messages() %}
+      {% for m in messages %}<div class="alert alert-ok flash">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+{% else %}
+  {% block bare %}{% endblock %}
+{% endif %}
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  {% block scripts %}{% endblock %}
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

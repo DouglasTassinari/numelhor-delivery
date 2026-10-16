@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Política de privacidade — {{ cfg.store_name }}{% endblock %}
+{% block description %}Como a {{ cfg.store_name }} usa e protege os seus dados nos pedidos feitos pelo site.{% endblock %}
+{% block content %}
+<div class="container" style="max-width:760px;padding-bottom:30px">
+  <a class="back" href="{{ url_for('public.index') }}">← Voltar ao cardápio</a>
+  <h1 class="page-title">Política de privacidade</h1>
+  <section class="panel legal">
+    <p>Esta página explica, em palavras simples, como a <strong>{{ cfg.store_name }}</strong> usa os seus dados quando você faz um pedido pelo site, conforme a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018).</p>
+
+    <h2>Quais dados pedimos</h2>
+    <ul>
+      <li><strong>Nome e WhatsApp</strong>: para identificar o pedido e falar com você.</li>
+      <li><strong>Endereço e localização no mapa</strong>, só se escolher entrega: para o motoboy chegar até você.</li>
+      <li><strong>E-mail</strong>, opcional: só para o comprovante do Pix.</li>
+      <li>O que você escolheu no pedido e a forma de pagamento.</li>
+    </ul>
+
+    <h2>Para que usamos</h2>
+    <p>Somente para preparar, entregar e cobrar o seu pedido e para atender você. <strong>Não vendemos nem repassamos seus dados</strong> para propaganda.</p>
+
+    <h2>Pagamentos</h2>
+    <p>Pagamentos com Pix e cartão pelo site são feitos pelo <strong>Mercado Pago</strong>. Os dados do cartão são digitados na página do Mercado Pago e <strong>nunca passam pelo nosso site</strong>.</p>
+
+    <h2>Neste aparelho</h2>
+    <p>O site guarda no seu próprio celular ou computador a sacola, seu nome e telefone (para não precisar digitar de novo) e a lista de "Meus pedidos". Para apagar, limpe os dados do navegador.</p>
+
+    <h2>Segurança</h2>
+    <p>O site usa conexão protegida (https). O painel da loja exige senha forte, bloqueia tentativas repetidas e registra as alterações importantes.</p>
+
+    <h2>Seus direitos</h2>
+    <p>Você pode pedir para ver, corrigir ou apagar seus dados a qualquer momento pelo
+      <a href="{{ whatsapp_url }}" target="_blank" rel="noopener">WhatsApp da loja</a>.</p>
+
+    <p class="muted small">{{ cfg.store_name }} · {{ cfg.store_address }} · {{ cfg.store_city }}</p>
+  </section>
+</div>
+{% endblock %}

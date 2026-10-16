@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% from "_macros.html" import wa_icon %}
+{% block title %}Pedido #{{ order.id }} — {{ cfg.store_name }}{% endblock %}
+{% block content %}
+{% set badge = "yellow" if order.status == "aguardando_pagamento" else ("red" if order.status == "cancelado" else "green") %}
+{% set last_step = ("saiu_entrega", "Saiu para entrega") if order.fulfillment == "entrega" else ("pronto_retirada", "Pronto para retirada") %}
+{% set steps = [("novo", "Pedido recebido"), ("confirmado", "Confirmado pela loja"), ("em_preparo", "Em preparo"), last_step, ("concluido", "Concluído")] %}
+{% set step_keys = steps|map(attribute=0)|list %}
+{% set current = step_keys.index(order.status) if order.status in step_keys else -1 %}
+
+<div class="container order-page" id="order" data-token="{{ order.token }}" data-id="{{ order.id }}" data-total="{{ order.total_cents|brl }}" data-status="{{ order.status }}" data-payment="{{ order.payment_status }}">
+  <a class="back" href="{{ url_for('public.my_orders') }}">← Meus pedidos</a>
+  <div class="order-head">
+    <h1>Pedido #{{ order.id }}</h1>
+    <span class="badge {{ badge }}">{{ state.status_label }}</span>
+  </div>
+
+  <div class="order-grid">
+    <div>
+      {% if order.status == "aguardando_pagamento" and order.pay_method == "pix" %}
+      <section class="panel">
+        <h2>Pague com Pix</h2>
+        <p class="muted">Abra o app do banco → Pix → <strong>Ler QR Code</strong>, ou copie o código abaixo. Valor: <strong>{{ order.total_cents|brl }}</strong></p>
+        <div class="pix-box">
+          <img src="data:image/png;base64,{{ order.pix_qr_b64 }}" alt="QR Code do Pix" width="220" height="220">
+          <div>
+            <label class="label" for="pix-code">Pix copia e cola</label>
+            <div class="copy-row">
+              <input type="text" id="pix-code" readonly value="{{ order.pix_copy_paste }}">
+              <button type="button" class="btn btn-yellow btn-sm" data-copy="#pix-code">Copiar</button>
+            </div>
+            <p>Expira em <span class="countdown" id="countdown" data-expires="{{ order.pix_expires_at }}">--:--</span></p>
+          </div>
+        </div>
+        <div class="waiting"><span class="dot"></span> Aguardando o pagamento… esta página atualiza sozinha.</div>
+        {% if simulation %}
+        <div class="sub-box">
+          <span class="test-badge">MODO TESTE</span>
+          <button type="button" class="btn btn-dark btn-sm" id="sim-pay" data-url="{{ url_for('public.sim_action', token=order.token, action='aprovar') }}">Simular Pix pago</button>
+        </div>
+        {% endif %}
+      </section>
+
+      {% elif order.status == "aguardando_pagamento" %}
+      <section class="panel">
+        <h2>Pagamento com cartão</h2>
+        {% if order.payment_status == "recusado" %}
+        <div class="alert alert-error">O pagamento não foi aprovado. Tente de novo, com outro cartão se precisar.</div>
+        {% endif %}
+        <p class="muted">Você vai para a página segura do Mercado Pago para digitar os dados do cartão.</p>
+        <a class="btn btn-yellow btn-lg btn-block" href="{{ order.checkout_url }}" id="pay-card">Pagar {{ order.total_cents|brl }} com cartão</a>
+        <div class="waiting"><span class="dot"></span> Assim que o pagamento for aprovado, esta página atualiza.</div>
+      </section>
+
+      {% elif order.status == "cancelado" %}
+      <section class="panel">
+        <h2>Pedido cancelado</h2>
+        <p class="muted">{% if order.payment_status == "expirado" %}O tempo para o pagamento acabou e o pedido foi cancelado automaticamente.{% else %}Este pedido foi cancelado.{% endif %} Qualquer dúvida, chama a gente.</p>
+        <div class="hero-cta">
+          <a class="btn btn-yellow" href="{{ url_for('public.index') }}">Fazer novo pedido</a>
+          <a class="btn btn-wa" href="{{ whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }} WhatsApp</a>
+        </div>
+      </section>
+
+      {% else %}
+      <section class="panel success">
+        <img src="{{ url_for('static', filename='img/obrigado.webp') }}" alt="Du do NuMelhor mandando um beijo">
+        <h2>Pedido recebido!</h2>
+        <p class="muted">Agora manda pra loja no WhatsApp que a gente confirma rapidinho:</p>
+        <a class="btn btn-wa btn-lg btn-block" id="wa-send" href="{{ state.whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }} Enviar pedido no WhatsApp</a>
+        <p class="hint" style="margin-top:12px">Seu pedido já está registrado no nosso sistema. O WhatsApp é só pra agilizar.</p>
+        <a class="btn btn-ghost btn-block" href="{{ url_for('public.index') }}" style="margin-top:6px">Voltar ao cardápio</a>
+      </section>
+      {% endif %}
+
+      <section class="panel">
+        <h2>Itens</h2>
+        {% for it in items %}
+        <div class="sum-line">
+          <div>
+            {{ it.qty }}x {{ it.name }}
+            {% for g, names in it.options|group_options %}<small>{{ g }}: {{ names }}</small>{% endfor %}
+            {% if it.removed %}<small class="sem">SEM {{ it.removed|join(", ")|lower }}</small>{% endif %}
+            {% if it.sauces %}<small>Molhos: {{ it.sauces|map(attribute="name")|join(", ") }}</small>{% endif %}
+            {% if it.notes %}<small>Obs.: {{ it.notes }}</small>{% endif %}
+          </div>
+          <strong>{{ it.line_total_cents|brl }}</strong>
+        </div>
+        {% endfor %}
+        <div class="totals" style="padding:12px 0 0">
+          <div><span>Subtotal</span><span>{{ order.subtotal_cents|brl }}</span></div>
+          {% if order.fulfillment == "entrega" %}<div><span>Entrega</span><span>{{ order.delivery_fee_cents|brl }}</span></div>{% endif %}
+          <div class="grand"><span>Total</span><span>{{ order.total_cents|brl }}</span></div>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2>Acompanhe</h2>
+        <ul class="timeline">
+          {% for key, label in steps %}
+          <li class="{{ 'done' if loop.index0 < current else ('current' if loop.index0 == current else '') }}">{{ label }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section class="panel">
+        <h2>Detalhes</h2>
+        <dl class="kv">
+          <dt>Nome</dt><dd>{{ order.customer_name }}</dd>
+          {% if order.fulfillment == "entrega" %}
+          <dt>Entrega</dt><dd>{{ order.address }}, {{ order.address_number }}{% if order.complement %} — {{ order.complement }}{% endif %}</dd>
+          {% else %}
+          <dt>Retirada</dt><dd>{{ cfg.store_address }} — {{ cfg.store_city }}</dd>
+          {% endif %}
+          <dt>Pagamento</dt><dd>{{ method_labels[order.pay_method] }} · {{ state.payment_label }}</dd>
+          {% if order.change_for_cents %}<dt>Troco para</dt><dd>{{ order.change_for_cents|brl }}</dd>{% endif %}
+          {% if order.notes %}<dt>Observação</dt><dd>{{ order.notes }}</dd>{% endif %}
+        </dl>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/order.js') }}"></script>
+{% endblock %}

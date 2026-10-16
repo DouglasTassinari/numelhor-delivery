@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% block title %}Pedidos{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Pedidos</h1>
+  <div class="top-actions">
+    <span class="small muted" id="last-update" aria-live="polite"></span>
+    <button type="button" class="btn btn-yellow btn-sm" id="alerts-btn">🔔 Ativar alerta de pedido novo</button>
+  </div>
+</div>
+
+<div class="board" id="board" data-api="{{ url_for('admin.api_orders') }}">
+  <section class="col" data-col="novo"><h2>Novos <span class="n">0</span></h2><div class="cards"></div></section>
+  <section class="col" data-col="andamento"><h2>Em andamento <span class="n">0</span></h2><div class="cards"></div></section>
+  <section class="col" data-col="saida"><h2>Saiu / Pronto <span class="n">0</span></h2><div class="cards"></div></section>
+  <section class="col" data-col="fim"><h2>Finalizados <span class="n">0</span></h2><div class="cards"></div></section>
+</div>
+
+<details class="panel waiting-list" id="waiting">
+  <summary>Aguardando pagamento online (<span class="n">0</span>)</summary>
+  <p class="hint" style="margin-top:8px">Pedidos em que o cliente escolheu pagar pelo site e ainda não pagou. Entram em "Novos" sozinhos quando o pagamento é aprovado, e são cancelados se não pagar em 30 min.</p>
+  <div class="cards"></div>
+</details>
+{% endblock %}

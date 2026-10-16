@@ -1,0 +1,27 @@
+# Publicação no Render (render.com) direto do GitHub.
+# Segredos (senha do painel, endereço público) são preenchidos no painel do Render, nunca aqui.
+services:
+  - type: web
+    name: numelhor
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    healthCheckPath: /saude
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: APP_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        value: dono
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false

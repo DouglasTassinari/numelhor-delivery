@@ -1,0 +1,82 @@
+{% extends "admin/base.html" %}
+{% block title %}Segurança{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:18px">Segurança</h1>
+{% for e in errors %}<div class="alert alert-error">{{ e }}</div>{% endfor %}
+
+<div class="order-grid">
+  <div>
+    <section class="panel">
+      <h2>Verificação em duas etapas (2FA)</h2>
+      {% if user.totp_enabled %}
+        <div class="alert alert-ok">Ativada ✅ — além da senha, o login pede o código do celular.</div>
+        <details>
+          <summary class="muted">Desativar 2FA</summary>
+          <form method="post" class="sub-box">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="field"><label for="dp">Senha atual</label><input type="password" id="dp" name="current_password" required></div>
+            <div class="field"><label for="dc">Código do autenticador</label><input type="text" id="dc" name="totp_code" inputmode="numeric" maxlength="7" required></div>
+            <button class="btn btn-danger" name="action" value="2fa_disable">Desativar</button>
+          </form>
+        </details>
+      {% elif setup %}
+        <ol class="muted">
+          <li>Instale o <strong>Google Authenticator</strong> ou <strong>Authy</strong> no celular.</li>
+          <li>Toque em “+” e leia este QR Code.</li>
+          <li>Digite abaixo o código de 6 dígitos que aparecer.</li>
+        </ol>
+        <img class="qr-white" src="data:image/png;base64,{{ setup.qr }}" alt="QR Code para o autenticador">
+        <p class="hint" style="margin-top:8px">Não consegue ler? Digite esta chave no app:</p>
+        <p class="secret">{{ setup.secret }}</p>
+        <form method="post" class="sub-box">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="field"><label for="code">Código de 6 dígitos</label><input type="text" id="code" name="code" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required></div>
+          <button class="btn btn-yellow" name="action" value="2fa_confirm">Ativar 2FA</button>
+        </form>
+      {% else %}
+        <div class="alert alert-info">Recomendado: com o 2FA, mesmo que alguém descubra sua senha, não consegue entrar sem o seu celular.</div>
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-yellow" name="action" value="2fa_start">Configurar 2FA</button>
+        </form>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Acesso</h2>
+      <dl class="kv">
+        <dt>Usuário</dt><dd>{{ user.username }}</dd>
+        <dt>Último login</dt><dd>{{ user.last_login_at or "—" }} (UTC)</dd>
+      </dl>
+      <div class="form-actions">
+        <a class="btn btn-dark" href="{{ url_for('admin.change_password') }}">Trocar senha</a>
+        <form method="post" data-confirm="Desconectar o painel de TODOS os aparelhos (inclusive este)?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-danger" name="action" value="logout_all">Sair de todos os aparelhos</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Registro de atividades</h2>
+    <p class="hint">Logins, tentativas erradas, mudanças de preço, de Pix/WhatsApp e pagamentos confirmados.</p>
+    <div class="table-wrap">
+      <table class="list log">
+        <thead><tr><th>Quando (UTC)</th><th>Evento</th><th>Quem / IP</th></tr></thead>
+        <tbody>
+        {% for l in logs %}
+          <tr>
+            <td class="small">{{ l.at }}</td>
+            <td class="{{ 'ev-warn' if ('falhou' in l.event or 'invalida' in l.event or l.event.isupper() or 'ALTERADA' in l.event or 'DESATIVADO' in l.event or 'divergente' in l.event) }}">{{ l.event }}{% if l.detail %}<br><span class="small muted">{{ l.detail }}</span>{% endif %}</td>
+            <td class="small">{{ l.actor }}<br><span class="muted">{{ l.ip }}</span></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3" class="muted">Nada registrado ainda.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

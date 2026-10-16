@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ product.name if product else "Novo produto" }}{% endblock %}
+{% block content %}
+{% set posted = request.method == "POST" %}
+<a class="back" href="{{ url_for('admin.products') }}" style="margin-top:0">← Cardápio</a>
+<h1 style="margin:10px 0 18px">{{ product.name if product else "Novo produto" }}</h1>
+
+{% for e in errors %}<div class="alert alert-error">{{ e }}</div>{% endfor %}
+
+<form method="post" enctype="multipart/form-data" class="checkout-grid product-form" id="product-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <section class="panel">
+      <h2>Informações</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="name">Nome</label>
+          <input type="text" id="name" name="name" maxlength="60" required value="{{ form.name if posted else (product.name if product else '') }}">
+        </div>
+        <div class="field">
+          <label for="category_id">Categoria</label>
+          {% set cur_cat = (form.category_id|int if posted else (product.category_id if product else 0)) %}
+          <select id="category_id" name="category_id" required>
+            <option value="">Escolha…</option>
+            {% for c in cats %}<option value="{{ c.id }}" {{ 'selected' if c.id == cur_cat }}>{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="price">Preço (R$)</label>
+          <input type="text" id="price" name="price" inputmode="decimal" required placeholder="32,90"
+                 value="{{ form.price if posted else ('%.2f'|format(product.price_cents / 100)|replace('.', ',') if product else '') }}">
+        </div>
+        <div class="field">
+          <label for="old_price">Preço antigo “de” <span class="opt">(só se estiver em promoção)</span></label>
+          <input type="text" id="old_price" name="old_price" inputmode="decimal" placeholder="Deixe vazio se não for promoção"
+                 value="{{ form.old_price if posted else ('%.2f'|format(product.old_price_cents / 100)|replace('.', ',') if product and product.old_price_cents else '') }}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="description">Descrição <span class="opt">(aparece no cardápio)</span></label>
+        <textarea id="description" name="description" maxlength="200" rows="2">{{ form.description if posted else (product.description if product else '') }}</textarea>
+      </div>
+      {% set sauces_on = ('allows_sauces' in form) if posted else (product.allows_sauces if product else true) %}
+      {% set active_on = ('active' in form) if posted else (product.active if product else true) %}
+      <label class="check"><input type="checkbox" name="allows_sauces" value="1" {{ 'checked' if sauces_on }}> Cliente pode escolher molhos</label>
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="active" value="1" {{ 'checked' if active_on }}> À venda (aparece no cardápio)</label>
+      {% set feat_on = ('featured' in form) if posted else (product.featured if product else false) %}
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="featured" value="1" {{ 'checked' if feat_on }}> ⭐ Mostrar nos Destaques (topo do cardápio)</label>
+    </section>
+
+    <section class="panel">
+      <h2>Opções: tamanho, sabor, adicionais</h2>
+      <p class="hint">Ex.: <strong>Tamanho</strong> (P, M, G), <strong>Sabor</strong> do refri, <strong>Adicionais</strong> pagos (bacon, ovo). O valor da opção é somado ao preço do produto. Use 0,00 quando não muda o preço.</p>
+      <div id="groups"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-dark btn-sm" data-preset="tamanho">+ Tamanho</button>
+        <button type="button" class="btn btn-dark btn-sm" data-preset="sabor">+ Sabor</button>
+        <button type="button" class="btn btn-dark btn-sm" data-preset="adicionais">+ Adicionais</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-preset="outro">+ Outro grupo</button>
+      </div>
+      <input type="hidden" name="groups_json" id="groups_json">
+      <script type="application/json" id="groups-data">{{ groups|tojson }}</script>
+    </section>
+
+    <section class="panel">
+      <h2>Ingredientes</h2>
+      <p class="hint">Marque "Pode tirar" nos itens que o cliente pode pedir SEM. Os "Sempre vai" aparecem só como informação.</p>
+      <div class="ing-rows" id="ing-rows">
+        {% for ing in ingredients %}
+        <div class="ing-row">
+          <input type="text" name="ing_name" maxlength="60" value="{{ ing.name }}" aria-label="Ingrediente">
+          <select name="ing_removable" aria-label="Pode tirar?">
+            <option value="1" {{ 'selected' if ing.removable }}>Pode tirar</option>
+            <option value="0" {{ 'selected' if not ing.removable }}>Sempre vai</option>
+          </select>
+          <button type="button" data-remove-row aria-label="Remover ingrediente">×</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-dark btn-sm" id="add-ing">+ Adicionar ingrediente</button>
+      <template id="ing-template">
+        <div class="ing-row">
+          <input type="text" name="ing_name" maxlength="60" aria-label="Ingrediente" placeholder="Ex.: Cebola">
+          <select name="ing_removable" aria-label="Pode tirar?">
+            <option value="1" selected>Pode tirar</option>
+            <option value="0">Sempre vai</option>
+          </select>
+          <button type="button" data-remove-row aria-label="Remover ingrediente">×</button>
+        </div>
+      </template>
+    </section>
+  </div>
+
+  <aside>
+    <section class="panel">
+      <h2>Foto</h2>
+      <img class="img-preview" id="img-preview" alt="" {% if product and product.image %}src="{{ url_for('public.upload', name=product.image) }}"{% else %}hidden{% endif %}>
+      <div class="field">
+        <label for="image">Enviar foto <span class="opt">(JPG, PNG ou WEBP, até 6 MB)</span></label>
+        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
+      </div>
+      {% if product and product.image %}<label class="check"><input type="checkbox" name="remove_image" value="1"> Remover foto atual</label>{% endif %}
+    </section>
+    <section class="panel">
+      <button class="btn btn-yellow btn-lg btn-block" type="submit">Salvar produto</button>
+    </section>
+  </aside>
+</form>
+
+{% if product %}
+<section class="panel danger-zone" style="margin-top:20px">
+  <h2>Excluir produto</h2>
+  <p class="muted">Prefira <strong>pausar</strong> (desmarcar "À venda") se for só temporário. Pedidos antigos continuam guardados.</p>
+  <form method="post" action="{{ url_for('admin.product_delete', product_id=product.id) }}" data-confirm="Excluir “{{ product.name }}” de vez?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-danger" type="submit">Excluir “{{ product.name }}”</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

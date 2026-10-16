@@ -1,0 +1,23 @@
+{% extends "admin/base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block bare %}
+<div class="auth-wrap">
+  <form method="post" class="panel auth-card" autocomplete="on">
+    <img class="logo" src="{{ url_for('static', filename='img/logo.webp') }}" alt="NuMelhor">
+    <h1>Painel do proprietário</h1>
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <div class="field">
+      <label for="username">Usuário</label>
+      <input type="text" id="username" name="username" autocomplete="username" autocapitalize="none" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Senha</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-yellow btn-lg btn-block" type="submit">Entrar</button>
+    <p class="hint" style="margin-top:14px;text-align:center">🔒 Após 5 tentativas erradas o acesso é bloqueado por 15 minutos.</p>
+  </form>
+</div>
+{% endblock %}

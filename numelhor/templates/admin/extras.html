@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% block title %}Categorias e molhos{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:18px">Categorias e molhos</h1>
+<div class="order-grid">
+  <section class="panel">
+    <h2>Categorias</h2>
+    <p class="hint">"Ordem" define a sequência no cardápio (menor aparece primeiro).</p>
+    {% for c in cats %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="id" value="{{ c.id }}">
+      <input type="text" name="name" value="{{ c.name }}" maxlength="40" aria-label="Nome da categoria">
+      <select name="icon" aria-label="Ícone">{% for k, v in icons.items() %}<option value="{{ k }}" {{ 'selected' if k == c.icon }}>{{ v }}</option>{% endfor %}</select>
+      <input type="number" name="sort" value="{{ c.sort }}" class="short" aria-label="Ordem">
+      <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if c.active }}> Visível</label>
+      <button class="btn btn-dark btn-sm" name="action" value="cat_save">Salvar</button>
+      <button class="btn btn-danger btn-sm" name="action" value="cat_delete" data-confirm-click="Excluir a categoria “{{ c.name }}”?">Excluir</button>
+    </form>
+    {% endfor %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="name" maxlength="40" placeholder="Nova categoria" aria-label="Nova categoria" required>
+      <select name="icon" aria-label="Ícone">{% for k, v in icons.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+      <input type="number" name="sort" value="{{ cats|length }}" class="short" aria-label="Ordem">
+      <button class="btn btn-yellow btn-sm" name="action" value="cat_add">+ Adicionar</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Molhos</h2>
+    <p class="hint">Aparecem para os produtos marcados com "Cliente pode escolher molhos". Preço 0 = grátis.</p>
+    {% for s in sauces %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="id" value="{{ s.id }}">
+      <input type="text" name="name" value="{{ s.name }}" maxlength="40" aria-label="Nome do molho">
+      <input type="text" name="price" value="{{ '%.2f'|format(s.price_cents / 100)|replace('.', ',') }}" class="short" inputmode="decimal" aria-label="Preço">
+      <input type="hidden" name="sort" value="{{ s.sort }}">
+      <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if s.active }}> Ativo</label>
+      <button class="btn btn-dark btn-sm" name="action" value="sauce_save">Salvar</button>
+      <button class="btn btn-danger btn-sm" name="action" value="sauce_delete" data-confirm-click="Excluir o molho “{{ s.name }}”?">Excluir</button>
+    </form>
+    {% endfor %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="name" maxlength="40" placeholder="Novo molho" aria-label="Novo molho" required>
+      <input type="text" name="price" value="0,00" class="short" inputmode="decimal" aria-label="Preço">
+      <input type="hidden" name="sort" value="{{ sauces|length }}">
+      <button class="btn btn-yellow btn-sm" name="action" value="sauce_add">+ Adicionar</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

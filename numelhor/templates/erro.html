@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ops! — NuMelhor</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;900&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <div class="error-page">
+    <img src="{{ url_for('static', filename='img/que-gatuuu.webp') }}" alt="">
+    <h1 class="page-title">Ops!</h1>
+    <p class="muted">{{ message }}</p>
+    <a class="btn btn-yellow" href="{{ url_for('public.index') }}">Voltar ao início</a>
+  </div>
+</body>
+</html>

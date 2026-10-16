@@ -1,0 +1,111 @@
+{% extends "admin/base.html" %}
+{% block title %}Pagamentos{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:6px">Pagamentos</h1>
+<p class="muted" style="margin-top:0">Onde o dinheiro dos pedidos pagos pelo site vai cair, e a chave Pix para cobrar na entrega/retirada.</p>
+{% for e in errors %}<div class="alert alert-error">{{ e }}</div>{% endfor %}
+
+<div class="order-grid">
+  <div>
+    <section class="panel">
+      <h2>Situação agora</h2>
+      {% if not creds %}
+        <div class="alert alert-info">🧪 <strong>Modo simulação.</strong> Nenhum dinheiro real é cobrado. Para receber de verdade, conecte a conta Mercado Pago da loja abaixo.</div>
+      {% else %}
+        <div class="alert {{ 'alert-ok' if not creds.sandbox else 'alert-info' }}">
+          {% if creds.sandbox %}🧪 <strong>Mercado Pago em TESTE</strong>: pagamentos de mentira, para conferir se está tudo certo.{% else %}✅ <strong>Mercado Pago em PRODUÇÃO</strong>: os pagamentos são reais e caem na conta abaixo.{% endif %}
+        </div>
+        <dl class="kv">
+          {% if account %}
+          <dt>Conta</dt><dd>{{ account.name or account.nickname }}{% if account.email %}<br><span class="muted small">{{ account.email }}</span>{% endif %}</dd>
+          {% endif %}
+          <dt>Access Token</dt><dd class="small">{{ token_mask }}</dd>
+          <dt>Cadastrado</dt><dd>{{ "no servidor (.env), travado" if locked else "aqui no painel (guardado criptografado)" }}</dd>
+          <dt>Avisos (webhook)</dt><dd>{{ "Assinatura configurada ✅" if creds.secret else "⚠️ Falta a assinatura secreta (passo 6)" }}</dd>
+        </dl>
+        <form method="post" style="margin-top:14px">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-dark btn-sm" name="action" value="mp_check">🔌 Testar conexão</button>
+        </form>
+      {% endif %}
+    </section>
+
+    {% if not locked %}
+    <form method="post" class="panel danger-zone" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>{{ "Trocar conta Mercado Pago" if creds else "Conectar o Mercado Pago" }}</h2>
+      <p class="hint">Siga o passo a passo ao lado para pegar os dados. Antes de salvar, o sistema confere direto no Mercado Pago de quem é a conta.</p>
+      <div class="seg" style="margin-bottom:14px">
+        <label class="option"><input type="radio" name="mp_mode" value="teste" {{ 'checked' if cfg.mp_mode != 'producao' }}><span class="box"><strong>🧪 Teste</strong><span>Token TEST-…, sem dinheiro real</span></span></label>
+        <label class="option"><input type="radio" name="mp_mode" value="producao" {{ 'checked' if cfg.mp_mode == 'producao' }}><span class="box"><strong>💰 Produção</strong><span>Token APP_USR-…, dinheiro real</span></span></label>
+      </div>
+      {% if not has_2fa %}
+      <div class="alert alert-info">🔒 Para usar <strong>Produção</strong> é obrigatório ativar a verificação em duas etapas em <a href="{{ url_for('admin.security_page') }}">Segurança</a>. Assim, mesmo que alguém descubra sua senha, não consegue trocar a conta que recebe o dinheiro.</div>
+      {% endif %}
+      <div class="field">
+        <label for="mp_token">Access Token</label>
+        <input type="password" id="mp_token" name="mp_token" autocomplete="off" spellcheck="false" required placeholder="APP_USR-… ou TEST-…">
+      </div>
+      <div class="field">
+        <label for="mp_webhook_secret">Assinatura secreta das notificações <span class="opt">(passo 6; deixe vazio para manter a atual)</span></label>
+        <input type="password" id="mp_webhook_secret" name="mp_webhook_secret" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field"><label for="mp_pw">Sua senha do painel</label><input type="password" id="mp_pw" name="current_password" autocomplete="current-password" required></div>
+      {% if has_2fa %}
+      <div class="field"><label for="mp_code">Código do autenticador</label><input type="text" id="mp_code" name="totp_code" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required></div>
+      {% endif %}
+      <button class="btn btn-red" name="action" value="mp_save">Conferir e salvar</button>
+    </form>
+
+    {% if creds and not locked %}
+    <form method="post" class="panel" data-confirm="Desconectar o Mercado Pago? O site volta para o modo simulação.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Desconectar</h2>
+      <div class="field"><label for="dc_pw">Sua senha do painel</label><input type="password" id="dc_pw" name="current_password" required></div>
+      {% if has_2fa %}<div class="field"><label for="dc_code">Código do autenticador</label><input type="text" id="dc_code" name="totp_code" inputmode="numeric" maxlength="7" required></div>{% endif %}
+      <button class="btn btn-danger" name="action" value="mp_disconnect">Desconectar Mercado Pago</button>
+    </form>
+    {% endif %}
+    {% endif %}
+
+    <form method="post" class="panel danger-zone" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Pix na entrega ou retirada</h2>
+      <p class="hint">Com a chave cadastrada, o painel mostra um QR Code com o valor do pedido para o cliente pagar na hora (no balcão ou com o motoboy). Esse QR não confirma sozinho: confira no app do banco se caiu.</p>
+      <div class="field"><label for="pix_key">Chave Pix da loja</label><input type="text" id="pix_key" name="pix_key" value="{{ cfg.pix_key }}" maxlength="77" placeholder="CNPJ, e-mail, telefone ou chave aleatória"></div>
+      <div class="form-grid">
+        <div class="field"><label for="pix_receiver_name">Nome do recebedor</label><input type="text" id="pix_receiver_name" name="pix_receiver_name" value="{{ cfg.pix_receiver_name }}" maxlength="25"></div>
+        <div class="field"><label for="pix_city">Cidade</label><input type="text" id="pix_city" name="pix_city" value="{{ cfg.pix_city }}" maxlength="15"></div>
+      </div>
+      <div class="field"><label for="px_pw">Sua senha do painel</label><input type="password" id="px_pw" name="current_password" autocomplete="current-password" required></div>
+      {% if has_2fa %}<div class="field"><label for="px_code">Código do autenticador</label><input type="text" id="px_code" name="totp_code" inputmode="numeric" maxlength="7" required></div>{% endif %}
+      <button class="btn btn-red" name="action" value="pix_save">Salvar chave Pix</button>
+    </form>
+  </div>
+
+  <section class="panel guide">
+    <h2>Passo a passo: Mercado Pago</h2>
+    <ol>
+      <li><strong>Crie a conta da loja</strong> em <a href="https://www.mercadopago.com.br" target="_blank" rel="noopener">mercadopago.com.br</a>. De preferência no CNPJ da lanchonete (se não tiver, pode ser CPF). O dinheiro dos pedidos cai nessa conta.</li>
+      <li><strong>Cadastre uma chave Pix na conta Mercado Pago</strong>: no app do Mercado Pago, vá em <em>Pix → Minhas chaves → Cadastrar chave</em>. Sem isso o Mercado Pago não gera QR Code de Pix.</li>
+      <li><strong>Crie a "aplicação" do site</strong> em <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noopener">Mercado Pago Developers → Suas integrações</a> → <em>Criar aplicação</em>. Nome: "Site NuMelhor"; tipo: <em>Pagamentos online</em>; produto: <em>Checkout Pro</em>.</li>
+      <li><strong>Teste primeiro:</strong> dentro da aplicação, em <em>Credenciais de teste</em>, copie o <strong>Access Token</strong> (começa com <code>TEST-</code>). Cole aqui ao lado escolhendo <strong>Teste</strong> e faça um pedido de teste no site.</li>
+      <li><strong>Ative a produção:</strong> em <em>Credenciais de produção</em>, preencha os dados do negócio que o Mercado Pago pedir e copie o <strong>Access Token</strong> que começa com <code>APP_USR-</code>. Ative o 2FA em <a href="{{ url_for('admin.security_page') }}">Segurança</a> e cole aqui escolhendo <strong>Produção</strong>.</li>
+      <li><strong>Avisos de pagamento (webhook):</strong> na aplicação, abra <em>Webhooks → Configurar notificações</em>. No campo <em>URL de produção</em> cole:
+        <div class="copy-row" style="margin:8px 0"><input type="text" id="wh-url" readonly value="{{ webhook_url }}"><button type="button" class="btn btn-yellow btn-sm" data-copy="#wh-url">Copiar</button></div>
+        marque o evento <em>Pagamentos</em> e salve. Depois copie a <strong>Assinatura secreta</strong> e cole no campo correspondente aqui.
+        {% if not https %}<div class="alert alert-info" style="margin-top:8px">⚠️ Os avisos automáticos só funcionam quando o site estiver na internet com https. Enquanto isso, o site confere o pagamento sozinho a cada poucos segundos.</div>{% endif %}
+      </li>
+      <li><strong>Teste de verdade:</strong> faça um pedido real de valor baixo pagando com Pix. Confirme que caiu na conta e, se quiser, devolva pelo próprio Mercado Pago.</li>
+    </ol>
+    <h2 style="margin-top:18px">Por que é seguro</h2>
+    <ul class="muted">
+      <li>O cliente digita o cartão na página do Mercado Pago. O site nunca vê nem guarda dados de cartão.</li>
+      <li>O dinheiro vai direto para a conta Mercado Pago da loja. O site não passa nem guarda dinheiro.</li>
+      <li>O token fica guardado <strong>criptografado</strong>. Trocar a conta exige senha, e em produção também o código do celular (2FA).</li>
+      <li>Toda troca de conta, de chave Pix ou de WhatsApp fica registrada em <a href="{{ url_for('admin.security_page') }}">Segurança</a>.</li>
+      <li>Um pedido só vira "pago" depois que o sistema confere no Mercado Pago o pedido e o valor.</li>
+    </ul>
+  </section>
+</div>
+{% endblock %}

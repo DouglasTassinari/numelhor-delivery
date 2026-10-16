@@ -1,0 +1,17 @@
+# Segredos e dados — nunca versionar
+.env
+instance/
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Diversos
+*.log
+.DS_Store
+Thumbs.db

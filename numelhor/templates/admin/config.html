@@ -1,0 +1,70 @@
+{% extends "admin/base.html" %}
+{% block title %}Configurações{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:18px">Configurações</h1>
+{% for e in errors %}<div class="alert alert-error">{{ e }}</div>{% endfor %}
+
+<div class="order-grid">
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="form" value="loja">
+    <h2>Loja e entrega</h2>
+    <div class="form-grid">
+      <div class="field"><label for="store_name">Nome da loja</label><input type="text" id="store_name" name="store_name" value="{{ cfg.store_name }}" maxlength="60"></div>
+      <div class="field"><label for="store_address">Endereço da loja (rua, nº, andar, bairro)</label><input type="text" id="store_address" name="store_address" value="{{ cfg.store_address }}" maxlength="120"></div>
+      <div class="field"><label for="store_city">Cidade</label><input type="text" id="store_city" name="store_city" value="{{ cfg.store_city }}" maxlength="60"></div>
+      <div class="field"><label for="pickup_eta">Tempo de retirada</label><input type="text" id="pickup_eta" name="pickup_eta" value="{{ cfg.pickup_eta }}" maxlength="30"></div>
+      <div class="field"><label for="store_instagram">Instagram (sem @)</label><input type="text" id="store_instagram" name="store_instagram" value="{{ cfg.store_instagram }}" maxlength="40"></div>
+      <div class="field"><label for="delivery_eta">Tempo de entrega</label><input type="text" id="delivery_eta" name="delivery_eta" value="{{ cfg.delivery_eta }}" maxlength="30"></div>
+    </div>
+    <label class="label">Localização da loja <span class="opt">(clique no mapa ou arraste o pino)</span></label>
+    <div class="mini-map" id="store-map" data-lat="{{ cfg.store_lat }}" data-lng="{{ cfg.store_lng }}"></div>
+    <input type="hidden" name="store_lat" id="store_lat" value="{{ cfg.store_lat }}">
+    <input type="hidden" name="store_lng" id="store_lng" value="{{ cfg.store_lng }}">
+
+    <h2 style="margin-top:20px">Taxa de entrega</h2>
+    <p class="hint">Taxa = base + (valor por km × km além dos incluídos). Distância estimada pelo mapa.</p>
+    <div class="form-grid">
+      <div class="field"><label for="delivery_base_cents">Taxa base (R$)</label><input type="text" id="delivery_base_cents" name="delivery_base_cents" inputmode="decimal" value="{{ '%.2f'|format(cfg.delivery_base_cents|int / 100)|replace('.', ',') }}"></div>
+      <div class="field"><label for="delivery_included_km">Km incluídos na base</label><input type="text" id="delivery_included_km" name="delivery_included_km" inputmode="decimal" value="{{ cfg.delivery_included_km }}"></div>
+      <div class="field"><label for="delivery_per_km_cents">Valor por km extra (R$)</label><input type="text" id="delivery_per_km_cents" name="delivery_per_km_cents" inputmode="decimal" value="{{ '%.2f'|format(cfg.delivery_per_km_cents|int / 100)|replace('.', ',') }}"></div>
+      <div class="field"><label for="delivery_max_km">Raio máximo (km)</label><input type="text" id="delivery_max_km" name="delivery_max_km" inputmode="decimal" value="{{ cfg.delivery_max_km }}"></div>
+    </div>
+    <h2 style="margin-top:20px">Horário de funcionamento</h2>
+    <p class="hint">A loja abre e fecha sozinha nesses horários. Pode passar da meia-noite (ex.: 18:00 às 01:00). Para fechar ou abrir fora do horário, use o botão lá em cima.</p>
+    <div class="hours-table">
+      {% for d in week %}
+      <div class="hours-row">
+        <strong>{{ d.day }}</strong>
+        <input type="time" name="open_{{ d.i }}" value="{{ d.open }}" aria-label="{{ d.day }}: abre às">
+        <span class="muted">às</span>
+        <input type="time" name="close_{{ d.i }}" value="{{ d.close }}" aria-label="{{ d.day }}: fecha às">
+        <label class="check"><input type="checkbox" name="closed_{{ d.i }}" value="1" {{ 'checked' if d.closed }}> Fechado</label>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="form-actions"><button class="btn btn-yellow" type="submit">Salvar loja e entrega</button></div>
+  </form>
+
+  <div>
+    <form method="post" class="panel danger-zone" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="form" value="whatsapp">
+      <h2>🔐 WhatsApp da loja</h2>
+      <p class="hint">É para esse número que os pedidos são enviados. Para mudar, confirme a senha{% if g.admin.totp_enabled %} e o código do autenticador{% endif %}.</p>
+      <div class="field"><label for="store_whatsapp">WhatsApp que recebe os pedidos</label><input type="tel" id="store_whatsapp" name="store_whatsapp" value="{{ cfg.store_whatsapp }}" maxlength="20"></div>
+      <div class="field"><label for="current_password">Sua senha atual</label><input type="password" id="current_password" name="current_password" autocomplete="current-password" required></div>
+      {% if g.admin.totp_enabled %}
+      <div class="field"><label for="totp_code">Código do autenticador</label><input type="text" id="totp_code" name="totp_code" inputmode="numeric" maxlength="7" required></div>
+      {% endif %}
+      <button class="btn btn-red" type="submit">Salvar WhatsApp</button>
+    </form>
+    <section class="panel">
+      <h2>💳 Pagamentos e Pix</h2>
+      <p class="hint">A conta que recebe os pagamentos pelo site (Mercado Pago) e a chave Pix ficam na página <a href="{{ url_for('admin.payments_page') }}">Pagamentos</a>.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>{% endblock %}

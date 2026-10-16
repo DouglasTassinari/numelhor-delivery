@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "_macros.html" import wa_icon, cat_emoji %}
+{% macro product_price(p) -%}
+<div class="price-row">
+  {% if p.price_varies %}<span class="from">a partir de</span>{% endif %}
+  <span class="price">{{ p.from_cents|brl }}</span>
+  {% if p.old_price_cents %}<span class="old">{{ p.old_price_cents|brl }}</span>{% endif %}
+</div>
+{%- endmacro %}
+{% block body_class %}has-bar{% endblock %}
+{% block content %}
+<section class="banner">
+  <div class="container banner-inner">
+    <div>
+      <h1>Que lanche <span class="y">brabo!</span></h1>
+      <p>Xis, hambúrguer e pastel em {{ cfg.store_city.split(' - ')[0].split(',')[0] }}. Monte do seu jeito e peça por aqui.</p>
+    </div>
+    <img src="{{ url_for('static', filename='img/mascote.webp') }}" alt="" width="240" height="240">
+  </div>
+</section>
+
+<div class="container">
+  <div class="quick">
+    <button type="button" class="quick-btn" data-open-info><span class="ic">🛵</span>Entrega e horários</button>
+    <a class="quick-btn" href="{{ url_for('public.my_orders') }}"><span class="ic">🧾</span>Meus pedidos</a>
+    <a class="quick-btn wa" href="{{ whatsapp_url }}" target="_blank" rel="noopener"><span class="ic">💬</span>WhatsApp</a>
+  </div>
+
+  {% if not store_open %}
+  <div class="closed-box">😴 {{ store_status.label }}. Pode olhar o cardápio à vontade: os pedidos abrem no nosso horário.</div>
+  {% endif %}
+
+  <div class="search" role="search">
+    <span class="ic" aria-hidden="true">🔍</span>
+    <input type="search" id="search" placeholder="Procurar no cardápio…" aria-label="Procurar no cardápio" autocomplete="off" enterkeyhint="search">
+    <button type="button" class="clear" id="search-clear" aria-label="Limpar busca" hidden>×</button>
+  </div>
+</div>
+
+<div class="chips-wrap">
+  <nav class="chips" aria-label="Categorias">
+    {% if menu.featured %}<a class="chip" href="#destaques">⭐ Destaques</a>{% endif %}
+    {% for c in menu.categories %}
+    <a class="chip" href="#cat-{{ c.id }}">{{ cat_emoji(c.icon) }} {{ c.name }}</a>
+    {% endfor %}
+  </nav>
+</div>
+
+<div class="container" id="menu">
+  {% if menu.featured %}
+  <section class="menu-section" id="destaques">
+    <h2>⭐ Destaques</h2>
+    <div class="featured">
+      {% for p in menu.featured %}
+      <button class="feat" type="button" data-product="{{ p.id }}">
+        <div class="thumb">{% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy">{% else %}<span class="emoji">{{ cat_emoji(p.icon) }}</span>{% endif %}</div>
+        {% if p.old_price_cents %}<span class="tag-promo">PROMOÇÃO</span>{% endif %}
+        <h3>{{ p.name }}</h3>
+        {{ product_price(p) }}
+      </button>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% for c in menu.categories %}
+  <section class="menu-section" id="cat-{{ c.id }}">
+    <h2><span aria-hidden="true">{{ cat_emoji(c.icon) }}</span> {{ c.name }}</h2>
+    <div class="grid">
+      {% for p in c.products %}
+      <button class="product" type="button" data-product="{{ p.id }}">
+        <div>
+          {% if p.old_price_cents %}<span class="tag-promo">PROMOÇÃO</span>{% endif %}
+          <h3>{{ p.name }}</h3>
+          {% if p.description %}<p>{{ p.description }}</p>{% endif %}
+          {{ product_price(p) }}
+          <span class="add-pill">+ Adicionar</span>
+        </div>
+        <div class="thumb">
+          {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy">{% else %}<span class="emoji">{{ cat_emoji(c.icon) }}</span>{% endif %}
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  <p class="no-results" id="no-results" hidden>Não achamos nada com esse nome. 🤔<br>Tente outra palavra ou chame a gente no WhatsApp.</p>
+</div>
+
+<div class="bottom-bar">
+  <div class="bottom-inner">
+    <a class="btn btn-wa solo" id="bar-wa" href="{{ whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }}<span class="lbl">Chamar no WhatsApp</span></a>
+    <button class="btn btn-yellow cart-btn" id="cartbar" type="button" hidden>
+      <span><span class="count" id="cart-count">0</span><span class="hide-xs">Ver </span>sacola</span>
+      <span class="total" id="cart-total">R$ 0,00</span>
+    </button>
+  </div>
+</div>
+
+<template id="info-template">
+  <div class="sheet-head"><h3 id="info-title">Entrega e horários</h3><button class="sheet-close" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="sheet-scroll"><div class="sheet-body">
+    <div class="status {{ 'open' if store_open else 'closed' }}" style="background:{{ '#dff5e8' if store_open else '#ffe1df' }};color:{{ '#0d5e31' if store_open else '#8c1014' }};margin-top:0">{{ store_status.label }}</div>
+    <div class="block">
+      <div class="block-title"><h4>🕒 Horário de funcionamento</h4></div>
+      <div class="info-list">
+        {% for day, text in hours_week %}<div class="{{ 'today' if loop.index0 == today_idx }}"><span>{{ day }}{% if loop.index0 == today_idx %} (hoje){% endif %}</span><span>{{ text }}</span></div>{% endfor %}
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-title"><h4>🛵 Entrega</h4></div>
+      <p class="hint" style="color:var(--text)">Tempo médio: <strong>{{ cfg.delivery_eta }}</strong>.<br>
+      Taxa: <strong>{{ cfg.delivery_base_cents|int|brl }}</strong> até {{ cfg.delivery_included_km }} km{% if cfg.delivery_per_km_cents|int %}, mais {{ cfg.delivery_per_km_cents|int|brl }} por km a mais{% endif %}.
+      Entregamos até {{ cfg.delivery_max_km }} km. O valor certinho aparece quando você marca o endereço.</p>
+    </div>
+    <div class="block">
+      <div class="block-title"><h4>🏪 Retirada no balcão</h4></div>
+      <p class="hint" style="color:var(--text)">Sem taxa. Fica pronto em <strong>{{ cfg.pickup_eta }}</strong>.<br>{{ cfg.store_address }} · {{ cfg.store_city }}<br>
+      <a href="https://www.google.com/maps/search/?api=1&query={{ cfg.store_lat }},{{ cfg.store_lng }}" target="_blank" rel="noopener">📍 Ver no mapa</a></p>
+    </div>
+    <div class="block">
+      <div class="block-title"><h4>💳 Formas de pagamento</h4></div>
+      <p class="hint" style="color:var(--text)">Pelo site: <strong>Pix</strong> ou <strong>cartão</strong>.<br>Na entrega ou retirada: <strong>dinheiro, Pix, débito ou crédito</strong>.</p>
+    </div>
+  </div></div>
+  <div class="sheet-foot"><a class="btn btn-wa btn-block" href="{{ whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }} Tirar dúvida no WhatsApp</a></div>
+</template>
+
+<script type="application/ld+json">{{ ld_json|tojson }}</script>
+<script type="application/json" id="menu-data">{{ menu|tojson }}</script>
+<script type="application/json" id="store-data">{{ {"open": store_open, "label": store_status.label}|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/menu.js') }}"></script>
+{% endblock %}

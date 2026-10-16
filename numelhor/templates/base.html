@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+{% set city = cfg.store_city.split(' - ')[0].split(',')[0] %}
+  <title>{% block title %}{{ cfg.store_name }} | Xis, hambúrguer e pastel em {{ city }} — Peça online{% endblock %}</title>
+  <meta name="description" content="{% block description %}Peça xis, hambúrguer, pastel e porções da {{ cfg.store_name }} em {{ city }}. Entrega ou retirada, pague com Pix, cartão ou na entrega. Monte seu lanche do seu jeito!{% endblock %}">
+  {% block robots %}{% endblock %}
+  <link rel="canonical" href="{{ config.PUBLIC_BASE_URL }}{{ request.path }}">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="{{ cfg.store_name }}">
+  <meta property="og:title" content="{{ self.title() }}">
+  <meta property="og:description" content="{{ self.description() }}">
+  <meta property="og:url" content="{{ config.PUBLIC_BASE_URL }}{{ request.path }}">
+  <meta property="og:image" content="{{ config.PUBLIC_BASE_URL }}{{ url_for('static', filename='img/og-image.jpg') }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#140d0b">
+  <link rel="manifest" href="{{ url_for('public.manifest') }}">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;800;900&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="store-head">
+    <div class="container store-head-inner">
+      <a href="{{ url_for('public.index') }}"><img class="store-logo" src="{{ url_for('static', filename='img/logo.webp') }}" alt="Logo NuMelhor" width="64" height="64"></a>
+      <div class="store-id">
+        <a href="{{ url_for('public.index') }}"><div class="store-name">Nu<span class="y">Melhor</span> Lanches</div></a>
+        <div class="status {{ 'open' if store_open else 'closed' }}">{{ store_status.label }}</div>
+      </div>
+    </div>
+  </header>
+
+  <main>{% block content %}{% endblock %}</main>
+
+  <footer class="footer">
+    <strong>{{ cfg.store_name }}</strong><br>
+    {{ cfg.store_address }} · {{ cfg.store_city }}<br>
+    {{ hours_summary }}<br>
+    {% if cfg.store_instagram %}<a href="https://www.instagram.com/{{ cfg.store_instagram }}/" target="_blank" rel="noopener">📷 Instagram @{{ cfg.store_instagram }}</a> · {% endif %}<a href="{{ whatsapp_url }}" target="_blank" rel="noopener">💬 WhatsApp</a> · <a href="{{ url_for('public.privacy') }}">Privacidade</a>
+  </footer>
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
