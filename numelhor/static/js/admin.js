@@ -25,15 +25,18 @@
   const onBoard = $("#board");
   if (alertBtn) {
     const ON_KEY = "nm_alert_on";
+    const PREFS_KEY = "nm_alert_prefs";
     const KNOWN_KEY = "nm_known_orders";
     const RING_KEY = "nm_last_ring";
-    const REPEAT_MS = 20000;
     const banner = $("#sound-banner");
     const offBtn = $("#alerts-off");
-    const sound = new Audio(alertBtn.dataset.sound);
-    sound.preload = "auto";
+    const chime = new Audio(alertBtn.dataset.sound);
+    const voiceNew = new Audio(alertBtn.dataset.voiceNew);
+    const voiceRemind = new Audio(alertBtn.dataset.voiceRemind);
+    [chime, voiceNew, voiceRemind].forEach((a) => { a.preload = "auto"; });
     const baseTitle = document.title;
     let enabled = NM.load(ON_KEY, false) === true;
+    let prefs = Object.assign({ mode: "voz", repeat: 60 }, NM.load(PREFS_KEY, {}));
     let unlocked = false;
     let wakeLock = null;
     const ss = {
@@ -43,6 +46,63 @@
     let firstData = ss.get(KNOWN_KEY, null) === null;
     const known = new Set(ss.get(KNOWN_KEY, []));
     let pendingNew = 0;
+
+    // ---- Voz (português do Brasil) ----
+    const synth = window.speechSynthesis || null;
+    let voice = null;
+    function pickVoice() {
+      if (!synth) return;
+      const all = synth.getVoices().filter((v) => /^pt[-_]BR/i.test(v.lang) || /portugu[eê]s.*brasil/i.test(v.name));
+      const pt = all.length ? all : synth.getVoices().filter((v) => /^pt/i.test(v.lang));
+      voice = pt.find((v) => /natural|neural|online/i.test(v.name))
+        || pt.find((v) => /google/i.test(v.name))
+        || pt.find((v) => /francisca|thalita|maria|luciana/i.test(v.name))
+        || pt[0] || null;
+    }
+    if (synth) {
+      pickVoice();
+      synth.addEventListener("voiceschanged", pickVoice);
+    }
+    const PHRASES = [
+      "Opa! Chegou pedido novo!",
+      "Pedido novo na área! Bora pra chapa!",
+      "Olha o pedido! Que lanche brabo!",
+      "Partiu NuMelhor! Tem pedido novo!",
+      "Deu fome em alguém! Chegou pedido!",
+    ];
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    function emReais(total) {
+      const n = parseFloat(String(total).replace(/[^\d,]/g, "").replace(",", "."));
+      if (!isFinite(n)) return "";
+      const reais = Math.floor(n);
+      const cents = Math.round((n - reais) * 100);
+      return `${reais} ${reais === 1 ? "real" : "reais"}${cents ? ` e ${cents} centavos` : ""}`;
+    }
+
+    function play(audio) {
+      audio.currentTime = 0;
+      return audio.play().then(() => true).catch(() => { unlocked = false; render(); return false; });
+    }
+
+    // Fala o texto; se não houver voz em português, toca o áudio gravado (ou o toque)
+    function say(text, fallbackAudio) {
+      if (prefs.mode === "toque") { play(chime); return; }
+      if (synth && voice) {
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.voice = voice;
+        u.lang = voice.lang || "pt-BR";
+        u.rate = 1.05;
+        u.pitch = 1.2;
+        u.volume = 1;
+        u.onerror = (e) => {
+          if (e.error === "not-allowed") { unlocked = false; render(); } else play(fallbackAudio);
+        };
+        synth.speak(u);
+        return;
+      }
+      play(fallbackAudio);
+    }
 
     function render() {
       banner.hidden = !(enabled && !unlocked);
@@ -55,35 +115,44 @@
         alertBtn.textContent = "🔔 Clique para ligar o som";
         alertBtn.classList.add("btn-red", "pulse");
       } else {
-        alertBtn.textContent = "🔔 Alerta ligado";
+        alertBtn.textContent = prefs.mode === "voz" ? "🗣️ Alerta ligado" : "🔔 Alerta ligado";
         alertBtn.classList.add("btn-dark");
-        alertBtn.title = "Clique para testar o som";
+        alertBtn.title = "Clique para testar";
       }
     }
 
     // O navegador só libera som depois de um clique na página: testamos tocando mudo.
     async function tryUnlock() {
       try {
-        sound.muted = true;
-        await sound.play();
-        sound.pause();
-        sound.currentTime = 0;
+        chime.muted = true;
+        await chime.play();
+        chime.pause();
+        chime.currentTime = 0;
         unlocked = true;
+        if (synth) { synth.cancel(); synth.resume(); }
       } catch {
         unlocked = false;
       }
-      sound.muted = false;
+      chime.muted = false;
       render();
       return unlocked;
     }
 
-    function ring(force) {
+    function announceNew(list) {
       if (!enabled || !unlocked) return;
-      const last = ss.get(RING_KEY, 0);
-      if (!force && Date.now() - last < REPEAT_MS) return;
       ss.set(RING_KEY, Date.now());
-      sound.currentTime = 0;
-      sound.play().catch(() => { unlocked = false; render(); });
+      const o = list[list.length - 1];
+      const head = list.length > 1 ? `Opa! Chegaram ${list.length} pedidos novos!` : pick(PHRASES);
+      const detail = `Pedido número ${o.id}, ${o.fulfillment === "entrega" ? "para entrega" : "para retirar"}, ${emReais(o.total)}.`;
+      say(`${head} ${detail}`, voiceNew);
+    }
+
+    function remind(force) {
+      if (!enabled || !unlocked || !pendingNew) return;
+      const every = Number(prefs.repeat) * 1000;
+      if (!force && (!every || Date.now() - ss.get(RING_KEY, 0) < every)) return;
+      ss.set(RING_KEY, Date.now());
+      say(`Ei! Ainda tem ${pendingNew} ${pendingNew > 1 ? "pedidos esperando" : "pedido esperando"} confirmação!`, voiceRemind);
     }
 
     async function keepAwake() {
@@ -107,12 +176,13 @@
       }
     }
 
+    const testAlert = () => say("Alerta ligado! Quando chegar pedido, eu aviso!", voiceNew);
     alertBtn.addEventListener("click", async () => {
-      if (enabled && unlocked) { ring(true); return; } // já ligado: o botão testa o som
+      if (enabled && unlocked) { testAlert(); return; } // já ligado: o botão testa
       enabled = true;
       NM.store(ON_KEY, true);
       await tryUnlock();
-      ring(true);
+      testAlert();
       if ("Notification" in window && Notification.permission === "default") {
         try { await Notification.requestPermission(); } catch { /* ignore */ }
       }
@@ -122,14 +192,35 @@
     offBtn.addEventListener("click", () => {
       enabled = false;
       NM.store(ON_KEY, false);
-      sound.pause();
+      if (synth) synth.cancel();
+      [chime, voiceNew, voiceRemind].forEach((a) => a.pause());
       render();
     });
+
+    // Preferências (tela Pedidos): voz ou toque, e de quanto em quanto tempo lembrar
+    const modeSel = $("#alert-mode");
+    const repeatSel = $("#alert-repeat");
+    if (modeSel && repeatSel) {
+      modeSel.value = prefs.mode;
+      repeatSel.value = String(prefs.repeat);
+      const savePrefs = () => {
+        prefs = { mode: modeSel.value, repeat: Number(repeatSel.value) };
+        NM.store(PREFS_KEY, prefs);
+        render();
+      };
+      modeSel.addEventListener("change", () => { savePrefs(); if (enabled && unlocked) testAlert(); });
+      repeatSel.addEventListener("change", savePrefs);
+      const testBtn = $("#alert-test");
+      if (testBtn) testBtn.addEventListener("click", async () => {
+        if (!unlocked) await tryUnlock();
+        say("Opa! Chegou pedido novo! Pedido número 1, para entrega, 25 reais.", voiceNew);
+      });
+    }
 
     // Qualquer clique, toque ou tecla na tela religa o som (o navegador exige isso a cada página)
     const onGesture = async () => {
       if (enabled && !unlocked && await tryUnlock()) {
-        if (pendingNew) ring(true);
+        if (pendingNew) remind(true);
         keepAwake();
       }
     };
@@ -164,13 +255,14 @@
       const fresh = novos.filter((o) => !known.has(o.id));
       fresh.forEach((o) => known.add(o.id));
       ss.set(KNOWN_KEY, [...known].slice(-300));
+      pendingNew = novos.length;
       if (fresh.length && !firstData) {
         notify(fresh);
-        ring(true);
+        announceNew(fresh);
+      } else {
+        remind(false); // lembra no intervalo escolhido enquanto houver pedido sem confirmar
       }
       firstData = false;
-      pendingNew = novos.length;
-      if (pendingNew) ring(false); // repete a cada 20 s enquanto houver pedido sem confirmar
       document.title = pendingNew ? `(${pendingNew}) Pedido novo! — NuMelhor` : baseTitle;
 
       if (onBoard) {

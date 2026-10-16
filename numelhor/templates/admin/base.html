@@ -24,6 +24,8 @@
               data-api="{{ url_for('admin.api_orders') }}"
               data-worker="{{ url_for('static', filename='js/alert-worker.js') }}"
               data-sound="{{ url_for('static', filename='sound/alerta.wav') }}"
+              data-voice-new="{{ url_for('static', filename='sound/pedido-novo.wav') }}"
+              data-voice-remind="{{ url_for('static', filename='sound/lembrete.wav') }}"
               data-icon="{{ url_for('static', filename='img/icon-192.png') }}">🔔 Ligar alerta de pedido</button>
       <button type="button" class="btn btn-sm btn-ghost" id="alerts-off" hidden>Desligar som</button>
       <span class="status {{ 'open' if store_open else 'closed' }}">{{ store_status.label }}</span>

@@ -8,6 +8,24 @@
   </div>
 </div>
 
+<div class="alert-prefs panel">
+  <label>Como avisar pedido novo:
+    <select id="alert-mode">
+      <option value="voz">🗣️ Voz falando o pedido</option>
+      <option value="toque">🔔 Toque (plim-plom)</option>
+    </select>
+  </label>
+  <label>Lembrar pedido sem confirmar:
+    <select id="alert-repeat">
+      <option value="30">a cada 30 segundos</option>
+      <option value="60">a cada 1 minuto</option>
+      <option value="120">a cada 2 minutos</option>
+      <option value="0">não lembrar</option>
+    </select>
+  </label>
+  <button type="button" class="btn btn-ghost btn-sm" id="alert-test">▶ Ouvir exemplo</button>
+</div>
+
 <div class="board" id="board" data-api="{{ url_for('admin.api_orders') }}">
   <section class="col" data-col="novo"><h2>Novos <span class="n">0</span></h2><div class="cards"></div></section>
   <section class="col" data-col="andamento"><h2>Em andamento <span class="n">0</span></h2><div class="cards"></div></section>

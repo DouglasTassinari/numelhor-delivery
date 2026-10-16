@@ -17,6 +17,9 @@
 .admin-nav a.on { background: var(--ink); color: #fff; }
 .admin-nav .site { margin-left: auto; }
 .admin-main { padding-top: 18px; padding-bottom: 60px; }
+.alert-prefs { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; margin-bottom: 16px; padding: 14px 16px; }
+.alert-prefs label { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: .92rem; flex: 1 1 220px; }
+.alert-prefs select { min-height: 46px; }
 .sound-banner { position: sticky; top: 0; z-index: 25; background: var(--yellow); color: #1d1400; font-weight: 800; text-align: center; padding: 12px 16px; cursor: pointer; box-shadow: var(--shadow-sm); }
 .pulse { animation: pulse-btn 1s ease-in-out infinite alternate; }
 @keyframes pulse-btn { to { box-shadow: 0 0 0 6px rgba(208, 22, 29, .35); } }
