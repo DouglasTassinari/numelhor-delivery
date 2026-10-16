@@ -42,7 +42,9 @@ def create_app():
     if len(secret_key) < 32:
         raise RuntimeError("Defina SECRET_KEY (32+ caracteres aleatórios) no arquivo .env")
     prod = os.environ.get("APP_ENV", "dev") == "production"
-    base_url = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
+    # PUBLIC_BASE_URL manual tem prioridade (ex.: domínio próprio); no Render usa o endereço que ele fornece.
+    base_url = (os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL")
+                or "http://127.0.0.1:5000").rstrip("/")
     if prod and not base_url.startswith("https://"):
         raise RuntimeError("Em produção o PUBLIC_BASE_URL precisa ser https://")
 

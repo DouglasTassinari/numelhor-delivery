@@ -1,5 +1,6 @@
 # Publicação no Render (render.com) direto do GitHub.
-# Segredos (senha do painel, endereço público) são preenchidos no painel do Render, nunca aqui.
+# A senha inicial do painel é digitada no Render na hora de criar, nunca aqui.
+# O endereço público vem sozinho do Render (RENDER_EXTERNAL_URL). Com domínio próprio, defina PUBLIC_BASE_URL.
 services:
   - type: web
     name: numelhor
@@ -17,8 +18,6 @@ services:
         value: "1"
       - key: SECRET_KEY
         generateValue: true
-      - key: PUBLIC_BASE_URL
-        sync: false
       - key: ADMIN_USERNAME
         value: dono
       - key: ADMIN_PASSWORD
