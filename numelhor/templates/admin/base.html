@@ -20,6 +20,12 @@
       <span>Nu<span class="y">Melhor</span> <small>Painel</small></span>
     </a>
     <div class="top-actions">
+      <button type="button" class="btn btn-sm btn-yellow" id="alerts-btn"
+              data-api="{{ url_for('admin.api_orders') }}"
+              data-worker="{{ url_for('static', filename='js/alert-worker.js') }}"
+              data-sound="{{ url_for('static', filename='sound/alerta.wav') }}"
+              data-icon="{{ url_for('static', filename='img/icon-192.png') }}">🔔 Ligar alerta de pedido</button>
+      <button type="button" class="btn btn-sm btn-ghost" id="alerts-off" hidden>Desligar som</button>
       <span class="status {{ 'open' if store_open else 'closed' }}">{{ store_status.label }}</span>
       <form method="post" action="{{ url_for('admin.store_mode') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -47,6 +53,7 @@
     <a href="{{ url_for('admin.security_page') }}" class="{{ 'on' if active == 'seguranca' }}">🔒 Segurança</a>
     <a href="{{ url_for('public.index') }}" class="site" target="_blank" rel="noopener">Ver site ↗</a>
   </nav>
+  <div class="sound-banner" id="sound-banner" role="button" tabindex="0" hidden>🔔 O navegador pausou o som dos pedidos. <strong>Clique aqui (ou em qualquer lugar da tela)</strong> para ligar de novo.</div>
   <main class="container admin-main">
     {% with messages = get_flashed_messages() %}
       {% for m in messages %}<div class="alert alert-ok flash">{{ m }}</div>{% endfor %}

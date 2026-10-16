@@ -20,57 +20,128 @@
     });
   });
 
-  // ---------- Quadro de pedidos ----------
-  const board = $("#board");
-  if (board) {
+  // ---------- Alerta de pedido novo (em todas as telas do painel) ----------
+  const alertBtn = $("#alerts-btn");
+  const onBoard = $("#board");
+  if (alertBtn) {
+    const ON_KEY = "nm_alert_on";
+    const KNOWN_KEY = "nm_known_orders";
+    const RING_KEY = "nm_last_ring";
+    const REPEAT_MS = 20000;
+    const banner = $("#sound-banner");
+    const offBtn = $("#alerts-off");
+    const sound = new Audio(alertBtn.dataset.sound);
+    sound.preload = "auto";
+    const baseTitle = document.title;
+    let enabled = NM.load(ON_KEY, false) === true;
+    let unlocked = false;
+    let wakeLock = null;
+    const ss = {
+      get(k, d) { try { const v = JSON.parse(sessionStorage.getItem(k)); return v === null ? d : v; } catch { return d; } },
+      set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
+    };
+    let firstData = ss.get(KNOWN_KEY, null) === null;
+    const known = new Set(ss.get(KNOWN_KEY, []));
+    let pendingNew = 0;
+
+    function render() {
+      banner.hidden = !(enabled && !unlocked);
+      offBtn.hidden = !enabled;
+      alertBtn.classList.remove("btn-yellow", "btn-dark", "btn-red", "pulse");
+      if (!enabled) {
+        alertBtn.textContent = "🔔 Ligar alerta de pedido";
+        alertBtn.classList.add("btn-yellow");
+      } else if (!unlocked) {
+        alertBtn.textContent = "🔔 Clique para ligar o som";
+        alertBtn.classList.add("btn-red", "pulse");
+      } else {
+        alertBtn.textContent = "🔔 Alerta ligado";
+        alertBtn.classList.add("btn-dark");
+        alertBtn.title = "Clique para testar o som";
+      }
+    }
+
+    // O navegador só libera som depois de um clique na página: testamos tocando mudo.
+    async function tryUnlock() {
+      try {
+        sound.muted = true;
+        await sound.play();
+        sound.pause();
+        sound.currentTime = 0;
+        unlocked = true;
+      } catch {
+        unlocked = false;
+      }
+      sound.muted = false;
+      render();
+      return unlocked;
+    }
+
+    function ring(force) {
+      if (!enabled || !unlocked) return;
+      const last = ss.get(RING_KEY, 0);
+      if (!force && Date.now() - last < REPEAT_MS) return;
+      ss.set(RING_KEY, Date.now());
+      sound.currentTime = 0;
+      sound.play().catch(() => { unlocked = false; render(); });
+    }
+
+    async function keepAwake() {
+      if (!enabled || !("wakeLock" in navigator) || document.visibilityState !== "visible" || wakeLock) return;
+      try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+      } catch { /* sem suporte ou negado */ }
+    }
+
+    function notify(list) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      for (const o of list.slice(0, 3)) {
+        try {
+          const n = new Notification(`🍔 Pedido novo #${o.id} — ${o.total}`, {
+            body: `${o.name} · ${o.fulfillment === "entrega" ? "Entrega" : "Retirada"}\nClique para abrir o pedido.`,
+            tag: `pedido-${o.id}`, requireInteraction: true, icon: alertBtn.dataset.icon,
+          });
+          n.onclick = () => { window.focus(); location.href = o.url; n.close(); };
+        } catch { /* ignore */ }
+      }
+    }
+
+    alertBtn.addEventListener("click", async () => {
+      if (enabled && unlocked) { ring(true); return; } // já ligado: o botão testa o som
+      enabled = true;
+      NM.store(ON_KEY, true);
+      await tryUnlock();
+      ring(true);
+      if ("Notification" in window && Notification.permission === "default") {
+        try { await Notification.requestPermission(); } catch { /* ignore */ }
+      }
+      keepAwake();
+      render();
+    });
+    offBtn.addEventListener("click", () => {
+      enabled = false;
+      NM.store(ON_KEY, false);
+      sound.pause();
+      render();
+    });
+
+    // Qualquer clique, toque ou tecla na tela religa o som (o navegador exige isso a cada página)
+    const onGesture = async () => {
+      if (enabled && !unlocked && await tryUnlock()) {
+        if (pendingNew) ring(true);
+        keepAwake();
+      }
+    };
+    ["pointerdown", "keydown", "touchstart"].forEach((ev) => document.addEventListener(ev, onGesture, true));
+    banner.addEventListener("click", onGesture);
+    document.addEventListener("visibilitychange", keepAwake);
+
+    // ---- Quadro de pedidos (só na tela Pedidos) ----
     const groups = {
       novo: ["novo"], andamento: ["confirmado", "em_preparo"],
       saida: ["saiu_entrega", "pronto_retirada"], fim: ["concluido", "cancelado"],
     };
-    const baseTitle = document.title;
-    let known = null;
-    let audio = null;
-    let unseen = 0;
-
-    function beep() {
-      if (!audio) return;
-      const now = audio.currentTime;
-      [0, 0.22, 0.44].forEach((t, i) => {
-        const osc = audio.createOscillator();
-        const gain = audio.createGain();
-        osc.frequency.value = i === 2 ? 1175 : 880;
-        gain.gain.setValueAtTime(0.0001, now + t);
-        gain.gain.exponentialRampToValueAtTime(0.35, now + t + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.18);
-        osc.connect(gain).connect(audio.destination);
-        osc.start(now + t);
-        osc.stop(now + t + 0.2);
-      });
-    }
-
-    $("#alerts-btn").addEventListener("click", async (e) => {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      await audio.resume();
-      beep();
-      if ("Notification" in window && Notification.permission === "default") {
-        try { await Notification.requestPermission(); } catch { /* ignore */ }
-      }
-      e.target.textContent = "🔔 Alerta ativo";
-      e.target.classList.replace("btn-yellow", "btn-dark");
-    });
-
-    function alertNew(count) {
-      unseen += count;
-      document.title = `(${unseen}) Novo pedido! — NuMelhor`;
-      beep();
-      if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-        new Notification("NuMelhor: novo pedido!", { body: `${count} pedido(s) novo(s) aguardando confirmação.` });
-      }
-    }
-    const clearTitle = () => { if (!document.hidden) { unseen = 0; document.title = baseTitle; } };
-    document.addEventListener("visibilitychange", clearTitle);
-    window.addEventListener("focus", clearTitle);
-
     const card = (o) => el("a", { class: `ocard${o.status === "novo" ? " fresh" : ""}`, href: o.url },
       el("div", { class: "top" }, el("span", { class: "id" }, `#${o.id}`), el("span", {}, o.time)),
       el("div", { class: "who" }, o.name),
@@ -78,35 +149,58 @@
         el("span", {}, o.fulfillment === "entrega" ? "🛵 Entrega" : "🏪 Retirada"),
         el("strong", {}, o.total)),
       el("div", { class: `pay${o.paid ? " paid" : ""}` }, o.status === "concluido" || o.status === "cancelado" ? `${o.status_label} · ${o.payment}` : o.payment));
-
     function fill(container, list, emptyText) {
       container.querySelector(".n").textContent = list.length;
-      const box = container.querySelector(".cards");
-      box.replaceChildren(...(list.length ? list.map(card) : [el("div", { class: "none" }, emptyText)]));
+      container.querySelector(".cards").replaceChildren(...(list.length ? list.map(card) : [el("div", { class: "none" }, emptyText)]));
     }
 
-    async function load() {
-      const r = await api(board.dataset.api);
-      if (!r.ok) {
-        if (/Sessão/.test(r.error || "")) location.reload();
-        $("#last-update").textContent = "⚠️ Sem conexão, tentando de novo…";
+    function onData({ status, data }) {
+      if (status === 401) { location.href = "/admin/login?next=" + encodeURIComponent(location.pathname); return; }
+      if (!data || !data.ok) {
+        if (onBoard) $("#last-update").textContent = "⚠️ Sem conexão, tentando de novo…";
         return;
       }
-      for (const [col, statuses] of Object.entries(groups)) {
-        fill(board.querySelector(`[data-col="${col}"]`), r.orders.filter((o) => statuses.includes(o.status)),
-          col === "novo" ? "Nenhum pedido novo" : "—");
+      const novos = data.orders.filter((o) => o.status === "novo");
+      const fresh = novos.filter((o) => !known.has(o.id));
+      fresh.forEach((o) => known.add(o.id));
+      ss.set(KNOWN_KEY, [...known].slice(-300));
+      if (fresh.length && !firstData) {
+        notify(fresh);
+        ring(true);
       }
-      fill($("#waiting"), r.orders.filter((o) => o.status === "aguardando_pagamento"), "Nenhum");
-      const novos = r.orders.filter((o) => o.status === "novo").map((o) => o.id);
-      if (known) {
-        const fresh = novos.filter((id) => !known.has(id));
-        if (fresh.length) alertNew(fresh.length);
+      firstData = false;
+      pendingNew = novos.length;
+      if (pendingNew) ring(false); // repete a cada 20 s enquanto houver pedido sem confirmar
+      document.title = pendingNew ? `(${pendingNew}) Pedido novo! — NuMelhor` : baseTitle;
+
+      if (onBoard) {
+        for (const [col, statuses] of Object.entries(groups)) {
+          fill(onBoard.querySelector(`[data-col="${col}"]`), data.orders.filter((o) => statuses.includes(o.status)),
+            col === "novo" ? "Nenhum pedido novo" : "—");
+        }
+        fill($("#waiting"), data.orders.filter((o) => o.status === "aguardando_pagamento"), "Nenhum");
+        $("#last-update").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
       }
-      known = new Set([...(known || []), ...novos]);
-      $("#last-update").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
     }
-    load();
-    setInterval(load, 5000);
+
+    // Busca dos pedidos num "worker" (não congela em segundo plano); sem suporte, na própria página
+    try {
+      const worker = new Worker(alertBtn.dataset.worker);
+      worker.onmessage = (e) => onData(e.data);
+      worker.postMessage({ url: alertBtn.dataset.api });
+    } catch {
+      const poll = async () => {
+        try {
+          const r = await fetch(alertBtn.dataset.api, { credentials: "same-origin", cache: "no-store" });
+          onData({ status: r.status, data: await r.json().catch(() => null) });
+        } catch { onData({ status: 0, data: null }); }
+      };
+      poll();
+      setInterval(poll, 5000);
+    }
+
+    render();
+    if (enabled) { tryUnlock(); keepAwake(); }
   }
 
   // ---------- Ingredientes ----------
