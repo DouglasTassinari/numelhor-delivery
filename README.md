@@ -42,6 +42,15 @@ copy .env.example .env      # preencha SECRET_KEY
 
 Para voltar ao cardápio padrão da loja (os pedidos antigos são mantidos), use `flask --app run recarregar-cardapio`.
 
+## Abrir pelo GitHub (Codespaces): jeito mais rápido para demonstrar
+
+1. No repositório, clique em **Code → aba Codespaces → Create codespace on main**.
+2. Espere de 2 a 4 minutos. O site liga sozinho e abre o arquivo `LINK-E-SENHA.txt`, com o link e a senha temporária do painel.
+3. Para o cliente abrir o link: na aba **PORTAS/PORTS** (parte de baixo da tela), clique com o botão direito na porta **5000** e escolha **Visibilidade da porta → Público**.
+4. Depois de ~30 min sem uso, o Codespace desliga sozinho. Para religar: github.com/codespaces → clique no NuMelhor. O site liga de novo e mantém pedidos, configurações e senha.
+
+> Se o Codespace for **excluído**, os dados dele (pedidos, senha do painel, Mercado Pago conectado) são apagados. O código continua no GitHub.
+
 ## Publicar (Render + GitHub)
 
 1. Suba este repositório no GitHub como **privado**.

@@ -1,0 +1,18 @@
+{
+  "name": "NuMelhor Delivery",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "forwardPorts": [5000],
+  "portsAttributes": {
+    "5000": {
+      "label": "Site NuMelhor",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["LINK-E-SENHA.txt"]
+    }
+  }
+}
