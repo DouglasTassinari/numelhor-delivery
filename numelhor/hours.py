@@ -43,25 +43,68 @@ def _open_by_schedule(cfg, now):
     return False, None
 
 
-def _next_opening(cfg, now):
-    minute = now.hour * 60 + now.minute
+def _when(now, target):
+    days = (target.date() - now.date()).days
+    return "hoje" if days == 0 else ("amanhã" if days == 1 else WEEKDAYS[target.weekday()].lower())
+
+
+def next_opening_at(cfg, now):
+    """Data/hora da próxima abertura pelo horário (depois de agora), ou None."""
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     for offset in range(0, 8):
-        day = (now.weekday() + offset) % 7
-        slot = parse(cfg[f"hours_{day}"])
-        if not slot or (offset == 0 and slot[0] <= minute):
+        slot = parse(cfg[f"hours_{(now.weekday() + offset) % 7}"])
+        if not slot:
             continue
-        when = "hoje" if offset == 0 else ("amanhã" if offset == 1 else WEEKDAYS[day].lower())
-        return f"abre {when} às {fmt(slot[0])}"
+        start = midnight + timedelta(days=offset, minutes=slot[0])
+        if start > now:
+            return start
     return None
+
+
+def next_closing_at(cfg, now):
+    """Até quando fica aberta ao clicar "Abrir agora": o fim do turno de hoje (ou o que está rolando).
+    Fora do horário e sem turno pela frente hoje, mantém aberta por 3 horas."""
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    candidates = []
+    for offset in (-1, 0):
+        slot = parse(cfg[f"hours_{(now.weekday() + offset) % 7}"])
+        if not slot:
+            continue
+        start, end = slot
+        end_dt = midnight + timedelta(days=offset + (1 if end <= start else 0), minutes=end)
+        if end_dt > now:
+            candidates.append(end_dt)
+    if candidates:
+        return min(candidates)
+    return now + timedelta(hours=3)
+
+
+def _next_opening(cfg, now):
+    start = next_opening_at(cfg, now)
+    return f"abre {_when(now, start)} às {fmt(start.hour * 60 + start.minute)}" if start else None
 
 
 def store_status(cfg, now=None):
     now = now or datetime.now(BRT)
     mode = cfg.get("open_mode", "auto")
+    until = None
+    if cfg.get("open_until"):
+        try:
+            until = datetime.fromtimestamp(int(cfg["open_until"]), BRT)
+        except (TypeError, ValueError):
+            until = None
+    if mode in ("aberto", "fechado") and until and now >= until:
+        mode = "auto"  # o "agora" já venceu: volta ao horário normal sozinho
     if mode == "fechado":
-        return {"open": False, "label": "Fechado no momento", "mode": mode}
+        label = "Fechado agora"
+        if until:
+            label += f" · abre {_when(now, until)} às {fmt(until.hour * 60 + until.minute)}"
+        return {"open": False, "label": label, "mode": mode}
     if mode == "aberto":
-        return {"open": True, "label": "Aberto agora", "mode": mode}
+        label = "Aberto agora"
+        if until:
+            label += f" · fecha às {fmt(until.hour * 60 + until.minute)}"
+        return {"open": True, "label": label, "mode": mode}
     is_open, closes = _open_by_schedule(cfg, now)
     if is_open:
         return {"open": True, "label": f"Aberto · fecha às {fmt(closes)}", "mode": mode}

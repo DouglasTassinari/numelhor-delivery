@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+{% from "admin/_cash_macros.html" import kpis, methods_table, split %}
+{% block title %}Caixa{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>💰 Caixa</h1>
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.reports_page') }}">📊 Ver relatórios</a>
+</div>
+
+{% if not session %}
+<section class="panel" style="max-width:560px">
+  <h2>Abrir o caixa</h2>
+  <p class="hint">Conte o dinheiro que já está na gaveta para troco e informe abaixo. Se não tiver, deixe 0,00.</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="abrir">
+    <div class="field">
+      <label for="open-amount">Dinheiro na gaveta (troco inicial)</label>
+      <input type="text" id="open-amount" name="amount" inputmode="decimal" value="0,00" required>
+    </div>
+    <button class="btn btn-yellow btn-lg" type="submit">Abrir caixa</button>
+  </form>
+</section>
+{% else %}
+<div class="alert alert-ok">🟢 Caixa aberto desde <strong>{{ local(session.opened_at) }}</strong> por {{ session.opened_by }}, com {{ session.opening_cents|brl }} de troco.</div>
+
+<section class="panel">
+  <h2>Vendas desde a abertura</h2>
+  {{ kpis(report.summary) }}
+  <div class="order-grid" style="margin-top:16px">
+    <div>{{ methods_table(report.summary, methods) }}</div>
+    <div>{{ split(report.summary) }}
+      {% if report.summary.waiting_count %}<p class="hint" style="margin-top:10px">⏳ {{ report.summary.waiting_count }} pedido(s) aguardando pagamento online (ainda não contam).</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+<div class="order-grid">
+  <section class="panel">
+    <h2>💵 Dinheiro na gaveta</h2>
+    <table class="list money">
+      <tbody>
+        <tr><td>Troco inicial</td><td>{{ session.opening_cents|brl }}</td></tr>
+        <tr><td>+ Vendas em dinheiro</td><td>{{ report.summary.cash_sales|brl }}</td></tr>
+        <tr><td>+ Reforços (colocou na gaveta)</td><td>{{ report.suprimentos|brl }}</td></tr>
+        <tr><td>− Retiradas (tirou da gaveta)</td><td>{{ report.sangrias|brl }}</td></tr>
+      </tbody>
+      <tfoot><tr><th>Deve ter na gaveta</th><th>{{ report.expected|brl }}</th></tr></tfoot>
+    </table>
+    {% if report.moves %}
+    <h3 class="sub-title">Movimentos</h3>
+    <ul class="moves">
+      {% for m in report.moves %}
+      <li><span>{{ local(m.at)[11:] }} · {{ "Retirada" if m.kind == "sangria" else "Reforço" }}{% if m.reason %} — {{ m.reason }}{% endif %}</span><strong class="{{ 'neg' if m.kind == 'sangria' }}">{{ "−" if m.kind == "sangria" else "+" }} {{ m.amount_cents|brl }}</strong></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Retirar ou colocar dinheiro</h2>
+    <p class="hint">Ex.: retirada para pagar o gás ou o motoboy; reforço de troco.</p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="seg" style="margin-bottom:12px">
+        <label class="option"><input type="radio" name="action" value="sangria" checked><span class="box"><strong>➖ Retirada</strong><span>tirar da gaveta</span></span></label>
+        <label class="option"><input type="radio" name="action" value="suprimento"><span class="box"><strong>➕ Reforço</strong><span>colocar na gaveta</span></span></label>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label for="mv-amount">Valor</label><input type="text" id="mv-amount" name="amount" inputmode="decimal" placeholder="0,00" required></div>
+        <div class="field"><label for="mv-reason">Motivo</label><input type="text" id="mv-reason" name="reason" maxlength="80" placeholder="Ex.: pagar gás"></div>
+      </div>
+      <button class="btn btn-dark" type="submit">Registrar</button>
+    </form>
+  </section>
+</div>
+
+<form method="post" class="panel danger-zone" data-confirm="Fechar o caixa agora? Depois de fechado, o relatório do dia fica salvo.">
+  <h2>Fechar o caixa</h2>
+  <p class="hint">Conte todo o dinheiro da gaveta e informe abaixo. O sistema mostra se sobrou ou faltou.</p>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="fechar">
+  <div class="form-grid">
+    <div class="field">
+      <label for="close-amount">Dinheiro contado na gaveta</label>
+      <input type="text" id="close-amount" name="amount" inputmode="decimal" required placeholder="{{ '%.2f'|format(report.expected / 100)|replace('.', ',') }}">
+      <span class="hint">O sistema espera {{ report.expected|brl }}.</span>
+    </div>
+    <div class="field">
+      <label for="close-notes">Observações <span class="opt">(opcional)</span></label>
+      <input type="text" id="close-notes" name="notes" maxlength="300">
+    </div>
+  </div>
+  <button class="btn btn-red btn-lg" type="submit">Fechar caixa e ver relatório</button>
+</form>
+{% endif %}
+
+{% if recent %}
+<section class="panel">
+  <h2>Últimos fechamentos</h2>
+  <div class="table-wrap">
+    <table class="list money">
+      <thead><tr><th>Aberto</th><th>Fechado</th><th>Vendas</th><th>Gaveta</th><th>Diferença</th><th></th></tr></thead>
+      <tbody>
+      {% for r in recent %}
+        {% set diff = (r.counted_cents or 0) - (r.expected_cents or 0) %}
+        <tr>
+          <td>{{ local(r.opened_at) }}</td><td>{{ local(r.closed_at) }}</td>
+          <td>{{ ((r.summary|fromjson).gross if r.summary else 0)|brl }}</td>
+          <td>{{ (r.counted_cents or 0)|brl }}</td>
+          <td class="{{ 'neg' if diff < 0 else ('pos' if diff > 0 else '') }}">{{ diff|brl }}</td>
+          <td><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.cash_session_page', session_id=r.id) }}">Ver</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

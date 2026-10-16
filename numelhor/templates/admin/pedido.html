@@ -9,8 +9,13 @@
   <h1>Pedido #{{ order.id }}</h1>
   <span class="badge {{ badge }}">{{ status_label }}</span>
   <span class="badge {{ 'green' if order.payment_status == 'pago' else '' }}">{{ payment_label }}</span>
-  <span class="muted small">{{ "🛵 Entrega" if order.fulfillment == "entrega" else "🏪 Retirada" }}</span>
+  <span class="muted small">{{ "🛵 Entrega" if order.fulfillment == "entrega" else "🏪 Retirada" }} · {{ created }}</span>
+  <button type="button" class="btn btn-dark btn-sm" data-print="{{ url_for('admin.order_print', order_id=order.id) }}" id="print-btn">🖨️ Imprimir pedido</button>
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.order_print', order_id=order.id) }}" target="_blank" rel="noopener">Ver comanda</a>
 </div>
+{% if order.status == "cancelado" %}
+<div class="alert alert-error">❌ Pedido cancelado {{ "pelo CLIENTE" if order.cancelled_by == "cliente" else "pela loja" }}{% if order.cancel_reason %}: {{ order.cancel_reason }}{% endif %}.{% if order.payment_status == "pago" %} Ele foi PAGO pelo site: devolva o valor no Mercado Pago.{% endif %}</div>
+{% endif %}
 
 <div class="order-grid">
   <div>
@@ -18,15 +23,19 @@
     <section class="panel">
       <h2>Próximo passo</h2>
       <div class="actions">
-        {% for value, label in actions %}
-        <form method="post" action="{{ url_for('admin.order_status', order_id=order.id) }}"
-              {% if value == 'cancelado' %}data-confirm="Cancelar o pedido #{{ order.id }}?{% if order.payment_status == 'pago' %} Ele já foi PAGO pelo site: lembre de devolver o valor no Mercado Pago.{% endif %}"{% endif %}>
+        {% for value, label in actions if value != 'cancelado' %}
+        <form method="post" action="{{ url_for('admin.order_status', order_id=order.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="status" value="{{ value }}">
-          <button type="submit" class="btn {{ 'btn-danger' if value == 'cancelado' else ('btn-yellow btn-lg' if loop.first else 'btn-dark btn-lg') }}">{{ label }}</button>
+          <button type="submit" class="btn {{ 'btn-yellow btn-lg' if loop.first else 'btn-dark btn-lg' }}">{{ label }}{% if value == 'confirmado' %} e imprimir{% endif %}</button>
         </form>
+        {% else %}
+        <p class="muted">{{ "Aguardando o cliente pagar pelo site." if order.status == "aguardando_pagamento" else "Pedido finalizado." }}</p>
         {% endfor %}
       </div>
+      {% if order.status == "novo" %}
+      <label class="check" style="margin-top:10px"><input type="checkbox" id="autoprint-pref" checked> Imprimir automaticamente ao confirmar</label>
+      {% endif %}
     </section>
     {% endif %}
 
@@ -57,7 +66,28 @@
       </div>
       {% if order.notes %}<div class="alert alert-info">📝 {{ order.notes }}</div>{% endif %}
     </section>
+    {% if can_cancel %}
+    <form method="post" action="{{ url_for('admin.order_status', order_id=order.id) }}" class="panel danger-zone"
+          data-confirm="Cancelar o pedido #{{ order.id }}? Ele sai do caixa.{% if order.payment_status == 'pago' %} ATENÇÃO: foi PAGO pelo site, devolva o valor no Mercado Pago.{% endif %}">
+      <h2>Cancelar pedido</h2>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="cancelado">
+      <div class="field">
+        <label for="cancel_reason">Motivo</label>
+        <select id="cancel_reason" name="cancel_reason" required>
+          <option value="">Escolha o motivo…</option>
+          {% for r in cancel_reasons %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="cancel_note">Detalhe <span class="opt">(opcional)</span></label>
+        <input type="text" id="cancel_note" name="cancel_note" maxlength="80">
+      </div>
+      <button type="submit" class="btn btn-danger">❌ Cancelar pedido #{{ order.id }}</button>
+    </form>
+    {% endif %}
   </div>
+
 
   <div>
     <section class="panel">

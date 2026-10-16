@@ -1,3 +1,4 @@
+import json
 import os
 import secrets
 from datetime import timedelta
@@ -95,6 +96,7 @@ def create_app():
 
     app.jinja_env.filters["brl"] = brl
     app.jinja_env.filters["group_options"] = group_options
+    app.jinja_env.filters["fromjson"] = lambda s: json.loads(s) if s else {}
 
     @app.errorhandler(400)
     @app.errorhandler(404)

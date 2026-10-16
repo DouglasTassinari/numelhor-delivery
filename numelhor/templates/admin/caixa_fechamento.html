@@ -1,0 +1,59 @@
+{% extends "admin/base.html" %}
+{% from "admin/_cash_macros.html" import kpis, methods_table, split, top_products, reasons %}
+{% block title %}Fechamento de caixa{% endblock %}
+{% block content %}
+{% set diff = (session.counted_cents or 0) - (report.expected) %}
+<div class="head-row no-print">
+  <a class="back" href="{{ url_for('admin.cash_page') }}" style="margin-top:0">← Caixa</a>
+  <button type="button" class="btn btn-yellow" data-window-print>🖨️ Imprimir relatório</button>
+</div>
+
+<div class="report">
+  <h1>Fechamento de caixa</h1>
+  <p class="muted">{{ cfg.store_name }} · aberto em {{ local(session.opened_at) }} por {{ session.opened_by }}
+    {% if session.closed_at %}· fechado em {{ local(session.closed_at) }} por {{ session.closed_by }}{% else %}· <strong>ainda aberto</strong>{% endif %}</p>
+
+  {% if session.closed_at %}
+  <div class="alert {{ 'alert-ok' if diff == 0 else ('alert-info' if diff > 0 else 'alert-error') }}">
+    {% if diff == 0 %}✅ Gaveta confere certinho: {{ session.counted_cents|brl }}.
+    {% elif diff > 0 %}🟡 Sobrou {{ diff|brl }} na gaveta (esperado {{ report.expected|brl }}, contado {{ session.counted_cents|brl }}).
+    {% else %}🔴 Faltou {{ (-diff)|brl }} na gaveta (esperado {{ report.expected|brl }}, contado {{ session.counted_cents|brl }}).{% endif %}
+  </div>
+  {% endif %}
+
+  <section class="panel">
+    <h2>Resumo</h2>
+    {{ kpis(report.summary) }}
+  </section>
+
+  <div class="order-grid">
+    <section class="panel"><h2>Por forma de pagamento</h2>{{ methods_table(report.summary, methods) }}</section>
+    <section class="panel">
+      <h2>💵 Gaveta</h2>
+      <table class="list money">
+        <tbody>
+          <tr><td>Troco inicial</td><td>{{ session.opening_cents|brl }}</td></tr>
+          <tr><td>+ Vendas em dinheiro</td><td>{{ report.summary.cash_sales|brl }}</td></tr>
+          <tr><td>+ Reforços</td><td>{{ report.suprimentos|brl }}</td></tr>
+          <tr><td>− Retiradas</td><td>{{ report.sangrias|brl }}</td></tr>
+          <tr><th>Esperado</th><th>{{ report.expected|brl }}</th></tr>
+          {% if session.closed_at %}<tr><th>Contado</th><th>{{ session.counted_cents|brl }}</th></tr>{% endif %}
+        </tbody>
+      </table>
+      {% if report.moves %}
+      <ul class="moves">
+        {% for m in report.moves %}<li><span>{{ local(m.at)[11:] }} · {{ "Retirada" if m.kind == "sangria" else "Reforço" }}{% if m.reason %} — {{ m.reason }}{% endif %}</span><strong>{{ "−" if m.kind == "sangria" else "+" }} {{ m.amount_cents|brl }}</strong></li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if session.notes %}<p><strong>Obs.:</strong> {{ session.notes }}</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="order-grid">
+    <section class="panel"><h2>Entrega x retirada</h2>{{ split(report.summary) }}</section>
+    <section class="panel"><h2>Cancelamentos</h2>{{ reasons(report.summary) }}</section>
+  </div>
+
+  <section class="panel"><h2>Mais vendidos</h2>{{ top_products(report.summary) }}</section>
+</div>
+{% endblock %}

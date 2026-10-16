@@ -34,6 +34,12 @@
           </div>
         </div>
         <div class="waiting"><span class="dot"></span> Aguardando o pagamento… esta página atualiza sozinha.</div>
+        {% if can_cancel %}
+        <form method="post" action="{{ url_for('public.customer_cancel', token=order.token) }}" data-confirm="Quer mesmo cancelar o pedido #{{ order.id }}?" style="margin-top:10px">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-btn">Desistir e cancelar o pedido</button>
+        </form>
+        {% endif %}
         {% if simulation %}
         <div class="sub-box">
           <span class="test-badge">MODO TESTE</span>
@@ -56,7 +62,7 @@
       {% elif order.status == "cancelado" %}
       <section class="panel">
         <h2>Pedido cancelado</h2>
-        <p class="muted">{% if order.payment_status == "expirado" %}O tempo para o pagamento acabou e o pedido foi cancelado automaticamente.{% else %}Este pedido foi cancelado.{% endif %} Qualquer dúvida, chama a gente.</p>
+        <p class="muted">{% if order.payment_status == "expirado" %}O tempo para o pagamento acabou e o pedido foi cancelado automaticamente.{% elif order.cancelled_by == "cliente" %}Você cancelou este pedido.{% else %}Este pedido foi cancelado pela loja{% if order.cancel_reason %} ({{ order.cancel_reason }}){% endif %}.{% endif %} Qualquer dúvida, chama a gente.</p>
         <div class="hero-cta">
           <a class="btn btn-yellow" href="{{ url_for('public.index') }}">Fazer novo pedido</a>
           <a class="btn btn-wa" href="{{ whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }} WhatsApp</a>
@@ -70,6 +76,12 @@
         <p class="muted">Agora manda pra loja no WhatsApp que a gente confirma rapidinho:</p>
         <a class="btn btn-wa btn-lg btn-block" id="wa-send" href="{{ state.whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }} Enviar pedido no WhatsApp</a>
         <p class="hint" style="margin-top:12px">Seu pedido já está registrado no nosso sistema. O WhatsApp é só pra agilizar.</p>
+        {% if can_cancel %}
+        <form method="post" action="{{ url_for('public.customer_cancel', token=order.token) }}" data-confirm="Quer mesmo cancelar o pedido #{{ order.id }}?" style="margin-top:10px">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-btn">Cancelar meu pedido</button>
+        </form>
+        {% endif %}
         <a class="btn btn-ghost btn-block" href="{{ url_for('public.index') }}" style="margin-top:6px">Voltar ao cardápio</a>
       </section>
       {% endif %}

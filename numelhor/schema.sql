@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS orders (
     pix_qr_b64         TEXT,
     pix_expires_at     TEXT,
     paid_at            TEXT,
+    cancel_reason      TEXT,
+    cancelled_at       TEXT,
+    cancelled_by       TEXT,
     last_check_at      REAL NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
@@ -112,6 +115,30 @@ CREATE TABLE IF NOT EXISTS order_items (
     options          TEXT NOT NULL DEFAULT '[]',
     notes            TEXT,
     line_total_cents INTEGER NOT NULL
+);
+
+-- Caixa: abertura (troco inicial), retiradas/reforços e fechamento com conferência da gaveta
+CREATE TABLE IF NOT EXISTS cash_sessions (
+    id             INTEGER PRIMARY KEY,
+    opened_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    opened_by      TEXT,
+    opening_cents  INTEGER NOT NULL DEFAULT 0,
+    closed_at      TEXT,
+    closed_by      TEXT,
+    counted_cents  INTEGER,
+    expected_cents INTEGER,
+    notes          TEXT,
+    summary        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cash_moves (
+    id           INTEGER PRIMARY KEY,
+    session_id   INTEGER NOT NULL REFERENCES cash_sessions(id),
+    at           TEXT NOT NULL DEFAULT (datetime('now')),
+    kind         TEXT NOT NULL CHECK (kind IN ('sangria', 'suprimento')),
+    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+    reason       TEXT,
+    by_user      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS admin_users (

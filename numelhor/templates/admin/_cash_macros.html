@@ -1,0 +1,83 @@
+{% macro kpis(s) -%}
+<div class="kpis">
+  <div class="kpi main"><span>Total vendido</span><strong>{{ s.gross|brl }}</strong></div>
+  <div class="kpi"><span>Pedidos</span><strong>{{ s.count }}</strong></div>
+  <div class="kpi"><span>Ticket médio</span><strong>{{ s.avg|brl }}</strong></div>
+  <div class="kpi"><span>Taxas de entrega</span><strong>{{ s.fees|brl }}</strong></div>
+  <div class="kpi"><span>Cancelados</span><strong>{{ s.cancelled_count }}</strong><small>{{ s.cancelled_total|brl }}</small></div>
+</div>
+{%- endmacro %}
+
+{% macro methods_table(s, methods) -%}
+<table class="list money">
+  <thead><tr><th>Forma de pagamento</th><th>Pedidos</th><th>Valor</th></tr></thead>
+  <tbody>
+  {% for key, label in methods %}
+    {% set m = s.by_method[key] %}
+    <tr class="{{ '' if m.count else 'off' }}"><td>{{ label }}</td><td>{{ m.count }}</td><td>{{ m.total|brl }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><th>Total</th><th>{{ s.count }}</th><th>{{ s.gross|brl }}</th></tr></tfoot>
+</table>
+{%- endmacro %}
+
+{% macro split(s) -%}
+<table class="list money">
+  <thead><tr><th>Tipo</th><th>Pedidos</th><th>Valor</th></tr></thead>
+  <tbody>
+    <tr><td>🛵 Entrega</td><td>{{ s.delivery_count }}</td><td>{{ s.delivery_total|brl }}</td></tr>
+    <tr><td>🏪 Retirada</td><td>{{ s.pickup_count }}</td><td>{{ s.pickup_total|brl }}</td></tr>
+  </tbody>
+</table>
+{%- endmacro %}
+
+{% macro top_products(s) -%}
+{% if s.top %}
+<div class="bars">
+  {% for t in s.top %}
+  <div class="bar-row">
+    <span class="bar-label">{{ t.name }}</span>
+    <span class="bar"><span style="width: {{ (100 * t.qty / s.max_top)|round(0, 'ceil')|int }}%"></span></span>
+    <span class="bar-val">{{ t.qty }} un · {{ t.total|brl }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}<p class="muted">Nenhuma venda no período.</p>{% endif %}
+{%- endmacro %}
+
+{% macro hours_chart(s) -%}
+{% if s.hours %}
+<div class="bars">
+  {% for h in s.hours %}
+  <div class="bar-row">
+    <span class="bar-label">{{ "%02d"|format(h.hour) }}h</span>
+    <span class="bar"><span style="width: {{ (100 * h.count / s.max_hour)|round(0, 'ceil')|int }}%"></span></span>
+    <span class="bar-val">{{ h.count }} pedido{{ "s" if h.count != 1 }} · {{ h.total|brl }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}<p class="muted">Nenhuma venda no período.</p>{% endif %}
+{%- endmacro %}
+
+{% macro days_chart(s) -%}
+<div class="bars">
+  {% for d in s.days %}
+  <div class="bar-row">
+    <span class="bar-label">{{ d.label }}</span>
+    <span class="bar"><span style="width: {{ ((100 * d.total / s.max_day) if s.max_day else 0)|round(0, 'ceil')|int }}%"></span></span>
+    <span class="bar-val">{{ d.total|brl }} · {{ d.count }} ped.</span>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro reasons(s) -%}
+{% if s.cancel_reasons %}
+<table class="list money">
+  <thead><tr><th>Motivo do cancelamento</th><th>Qtde</th><th>Valor</th></tr></thead>
+  <tbody>
+  {% for r, v in s.cancel_reasons.items() %}<tr><td>{{ r }}</td><td>{{ v.count }}</td><td>{{ v.total|brl }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">Nenhum pedido cancelado. 👏</p>{% endif %}
+{%- endmacro %}

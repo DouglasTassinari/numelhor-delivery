@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Pedido #{{ order.id }} — comanda</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}">
+</head>
+<body class="paper-{{ paper if paper in ('58', '80', 'a4') else '80' }}" data-autoprint="{{ '0' if request.args.get('embed') else '1' }}">
+  <div class="toolbar no-print">
+    <button type="button" id="print-now">🖨️ Imprimir</button>
+    <span>Papel:</span>
+    <a href="?papel=80" class="{{ 'on' if paper == '80' }}">80 mm</a>
+    <a href="?papel=58" class="{{ 'on' if paper == '58' }}">58 mm</a>
+    <a href="?papel=a4" class="{{ 'on' if paper == 'a4' }}">Folha A4</a>
+    <a href="{{ url_for('admin.order_detail', order_id=order.id) }}">← Voltar ao pedido</a>
+  </div>
+
+  <main class="ticket">
+    <div class="center">
+      <div class="store">{{ cfg.store_name }}</div>
+      <div class="small">{{ cfg.store_address }}</div>
+    </div>
+    <div class="sep"></div>
+    <div class="big center">PEDIDO #{{ order.id }}</div>
+    <div class="center">{{ created }}</div>
+    <div class="center tag">{{ "🛵 ENTREGA" if order.fulfillment == "entrega" else "🏪 RETIRADA NO BALCÃO" }}</div>
+    {% if order.status == "cancelado" %}<div class="center tag inverse">*** CANCELADO ***</div>{% endif %}
+    <div class="sep"></div>
+
+    <div><b>Cliente:</b> {{ order.customer_name }}</div>
+    <div><b>Fone:</b> {{ order.customer_phone }}</div>
+
+    {% if order.fulfillment == "entrega" %}
+    <div class="sep"></div>
+    <div><b>Endereço:</b> {{ order.address }}, nº {{ order.address_number }}</div>
+    {% if order.complement %}<div><b>Compl.:</b> {{ order.complement }}</div>{% endif %}
+    {% if order.reference %}<div><b>Ref.:</b> {{ order.reference }}</div>{% endif %}
+    {% if maps_qr %}
+    <div class="qr"><img src="data:image/png;base64,{{ maps_qr }}" alt="QR Code do endereço"><div class="small">Aponte a câmera para abrir o mapa</div></div>
+    {% endif %}
+    {% endif %}
+
+    <div class="sep"></div>
+    {% for it in items %}
+    <div class="item">
+      <div class="row"><b>{{ it.qty }}x {{ it.name }}</b><span>{{ it.line_total_cents|brl }}</span></div>
+      {% for g, names in it.options|group_options %}<div class="sub">+ {{ g }}: {{ names }}</div>{% endfor %}
+      {% if it.removed %}<div class="sub sem">SEM: {{ it.removed|join(", ")|upper }}</div>{% endif %}
+      {% if it.sauces %}<div class="sub">Molhos: {{ it.sauces|map(attribute="name")|join(", ") }}</div>{% endif %}
+      {% if it.notes %}<div class="sub">Obs.: {{ it.notes }}</div>{% endif %}
+    </div>
+    {% endfor %}
+    {% if order.notes %}<div class="sep"></div><div><b>OBS. DO PEDIDO:</b> {{ order.notes }}</div>{% endif %}
+
+    <div class="sep"></div>
+    <div class="row"><span>Subtotal</span><span>{{ order.subtotal_cents|brl }}</span></div>
+    {% if order.fulfillment == "entrega" %}<div class="row"><span>Entrega</span><span>{{ order.delivery_fee_cents|brl }}</span></div>{% endif %}
+    <div class="row big"><span>TOTAL</span><span>{{ order.total_cents|brl }}</span></div>
+
+    <div class="sep"></div>
+    <div><b>Pagamento:</b> {{ method_label }} {{ "pelo site" if order.pay_when == "online" else ("na entrega" if order.fulfillment == "entrega" else "na retirada") }}</div>
+    {% if order.payment_status == "pago" %}
+    <div class="center tag inverse">JÁ PAGO — NÃO COBRAR</div>
+    {% elif order.pay_when == "entrega" %}
+    <div class="center tag">COBRAR {{ order.total_cents|brl }}</div>
+    {% if order.change_for_cents %}<div class="center">Troco para {{ order.change_for_cents|brl }} → levar <b>{{ (order.change_for_cents - order.total_cents)|brl }}</b></div>{% endif %}
+    {% endif %}
+    <div class="sep"></div>
+    <div class="center small">Obrigado pela preferência! ❤️</div>
+  </main>
+  <script src="{{ url_for('static', filename='js/print.js') }}"></script>
+</body>
+</html>

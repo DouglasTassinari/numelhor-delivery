@@ -20,6 +20,44 @@
     });
   });
 
+  // ---------- Impressão do pedido (comanda) ----------
+  const PAPER_KEY = "nm_paper";
+  // Imprime numa moldura invisível: a tela atual não muda e dá para imprimir de novo quantas vezes precisar
+  function printOrder(url) {
+    const paper = NM.load(PAPER_KEY, "80");
+    document.querySelectorAll("iframe.print-frame").forEach((f) => f.remove());
+    const frame = el("iframe", { class: "print-frame", title: "Comanda", "aria-hidden": "true",
+      src: `${url}?embed=1&papel=${encodeURIComponent(paper)}` });
+    frame.addEventListener("load", () => {
+      try {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+      } catch {
+        window.open(`${url}?papel=${encodeURIComponent(paper)}`, "_blank");
+      }
+    });
+    document.body.append(frame);
+  }
+  document.querySelectorAll("[data-print]").forEach((b) => b.addEventListener("click", () => printOrder(b.dataset.print)));
+  document.querySelectorAll("[data-window-print]").forEach((b) => b.addEventListener("click", () => window.print()));
+
+  // Confirmou o pedido: imprime sozinho (se a opção estiver marcada)
+  const AUTOPRINT_KEY = "nm_autoprint";
+  const autoPref = $("#autoprint-pref");
+  if (autoPref) {
+    autoPref.checked = NM.load(AUTOPRINT_KEY, true) !== false;
+    autoPref.addEventListener("change", () => NM.store(AUTOPRINT_KEY, autoPref.checked));
+  }
+  const printBtn = $("#print-btn");
+  const params = new URLSearchParams(location.search);
+  if (printBtn && params.get("imprimir") === "1") {
+    history.replaceState(null, "", location.pathname); // atualizar a página não imprime de novo
+    if (NM.load(AUTOPRINT_KEY, true) !== false) {
+      printOrder(printBtn.dataset.print);
+      printBtn.textContent = "🖨️ Imprimir de novo";
+    }
+  }
+
   // ---------- Alerta de pedido novo (em todas as telas do painel) ----------
   const alertBtn = $("#alerts-btn");
   const onBoard = $("#board");
@@ -36,7 +74,7 @@
     [chime, voiceNew, voiceRemind].forEach((a) => { a.preload = "auto"; });
     const baseTitle = document.title;
     let enabled = NM.load(ON_KEY, false) === true;
-    let prefs = Object.assign({ mode: "voz", repeat: 60 }, NM.load(PREFS_KEY, {}));
+    let prefs = Object.assign({ mode: "voz", repeat: 60, voice: "" }, NM.load(PREFS_KEY, {}));
     let unlocked = false;
     let wakeLock = null;
     const ss = {
@@ -50,14 +88,27 @@
     // ---- Voz (português do Brasil) ----
     const synth = window.speechSynthesis || null;
     let voice = null;
+    let ptVoices = [];
+    const MALE = /antonio|daniel|donato|fabio|humberto|julio|nicolau|valerio|male|masculin/i;
     function pickVoice() {
       if (!synth) return;
-      const all = synth.getVoices().filter((v) => /^pt[-_]BR/i.test(v.lang) || /portugu[eê]s.*brasil/i.test(v.name));
-      const pt = all.length ? all : synth.getVoices().filter((v) => /^pt/i.test(v.lang));
-      voice = pt.find((v) => /natural|neural|online/i.test(v.name))
-        || pt.find((v) => /google/i.test(v.name))
-        || pt.find((v) => /francisca|thalita|maria|luciana/i.test(v.name))
-        || pt[0] || null;
+      const br = synth.getVoices().filter((v) => /^pt[-_]BR/i.test(v.lang) || /portugu[eê]s.*brasil/i.test(v.name));
+      ptVoices = br.length ? br : synth.getVoices().filter((v) => /^pt/i.test(v.lang));
+      voice = ptVoices.find((v) => v.name === prefs.voice)
+        || ptVoices.find((v) => MALE.test(v.name) && /natural|neural|online/i.test(v.name))
+        || ptVoices.find((v) => MALE.test(v.name))
+        || ptVoices.find((v) => /natural|neural|online/i.test(v.name))
+        || ptVoices.find((v) => /google/i.test(v.name))
+        || ptVoices[0] || null;
+      fillVoiceSelect();
+    }
+    function fillVoiceSelect() {
+      const sel = $("#alert-voice");
+      if (!sel) return;
+      sel.replaceChildren(...ptVoices.map((v) => el("option", { value: v.name },
+        `${v.name.replace(/Microsoft |Google |\(Natural\)| - .*$|Online/g, "").trim()}${MALE.test(v.name) ? " (masculina)" : ""}`)));
+      if (!ptVoices.length) sel.append(el("option", { value: "" }, "Sem voz em português neste aparelho"));
+      if (voice) sel.value = voice.name;
     }
     if (synth) {
       pickVoice();
@@ -92,8 +143,9 @@
         const u = new SpeechSynthesisUtterance(text);
         u.voice = voice;
         u.lang = voice.lang || "pt-BR";
-        u.rate = 1.05;
-        u.pitch = 1.2;
+        const male = MALE.test(voice.name);
+        u.rate = male ? 1.0 : 1.05;
+        u.pitch = male ? 0.8 : 0.9;
         u.volume = 1;
         u.onerror = (e) => {
           if (e.error === "not-allowed") { unlocked = false; render(); } else play(fallbackAudio);
@@ -204,11 +256,22 @@
       modeSel.value = prefs.mode;
       repeatSel.value = String(prefs.repeat);
       const savePrefs = () => {
-        prefs = { mode: modeSel.value, repeat: Number(repeatSel.value) };
+        prefs = { ...prefs, mode: modeSel.value, repeat: Number(repeatSel.value) };
         NM.store(PREFS_KEY, prefs);
         render();
       };
       modeSel.addEventListener("change", () => { savePrefs(); if (enabled && unlocked) testAlert(); });
+      const voiceSel = $("#alert-voice");
+      if (voiceSel) {
+        fillVoiceSelect();
+        voiceSel.addEventListener("change", async () => {
+          prefs.voice = voiceSel.value;
+          NM.store(PREFS_KEY, prefs);
+          pickVoice();
+          if (!unlocked) await tryUnlock();
+          say("Opa! Chegou pedido novo! Pedido número 1, para entrega, 25 reais.", voiceNew);
+        });
+      }
       repeatSel.addEventListener("change", savePrefs);
       const testBtn = $("#alert-test");
       if (testBtn) testBtn.addEventListener("click", async () => {
@@ -240,9 +303,13 @@
         el("span", {}, o.fulfillment === "entrega" ? "🛵 Entrega" : "🏪 Retirada"),
         el("strong", {}, o.total)),
       el("div", { class: `pay${o.paid ? " paid" : ""}` }, o.status === "concluido" || o.status === "cancelado" ? `${o.status_label} · ${o.payment}` : o.payment));
+    const cardWithPrint = (o) => el("div", { class: "ocard-wrap" }, card(o),
+      o.status !== "aguardando_pagamento"
+        ? el("button", { class: "ocard-print", type: "button", title: `Imprimir pedido #${o.id}`, "aria-label": `Imprimir pedido #${o.id}`,
+          onclick: () => printOrder(o.print_url) }, "🖨️") : null);
     function fill(container, list, emptyText) {
       container.querySelector(".n").textContent = list.length;
-      container.querySelector(".cards").replaceChildren(...(list.length ? list.map(card) : [el("div", { class: "none" }, emptyText)]));
+      container.querySelector(".cards").replaceChildren(...(list.length ? list.map(cardWithPrint) : [el("div", { class: "none" }, emptyText)]));
     }
 
     function onData({ status, data }) {
@@ -251,6 +318,19 @@
         if (onBoard) $("#last-update").textContent = "⚠️ Sem conexão, tentando de novo…";
         return;
       }
+      const prevStatus = ss.get("nm_status_map", {});
+      const nowStatus = {};
+      for (const o of data.orders) {
+        nowStatus[o.id] = o.status;
+        const before = prevStatus[o.id];
+        if (before && before !== "cancelado" && o.status === "cancelado" && o.cancelled_by === "cliente") {
+          if (enabled && unlocked) say(`Atenção! O cliente cancelou o pedido número ${o.id}.`, voiceRemind);
+          if ("Notification" in window && Notification.permission === "granted") {
+            try { new Notification(`❌ Pedido #${o.id} cancelado pelo cliente`, { body: `${o.name} · ${o.total}`, tag: `cancel-${o.id}`, icon: alertBtn.dataset.icon }); } catch { /* ignore */ }
+          }
+        }
+      }
+      ss.set("nm_status_map", nowStatus);
       const novos = data.orders.filter((o) => o.status === "novo");
       const fresh = novos.filter((o) => !known.has(o.id));
       fresh.forEach((o) => known.add(o.id));

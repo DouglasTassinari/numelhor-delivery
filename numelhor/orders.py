@@ -44,7 +44,7 @@ TRANSITIONS = {
     "em_preparo": ["saiu_entrega", "pronto_retirada", "cancelado"],
     "saiu_entrega": ["concluido", "cancelado"],
     "pronto_retirada": ["concluido", "cancelado"],
-    "concluido": [],
+    "concluido": ["cancelado"],
     "cancelado": [],
 }
 ACTION_LABELS = {
@@ -117,6 +117,20 @@ def set_status(order_id, status, payment_status=None):
     else:
         db.execute("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?", (status, order_id))
     db.commit()
+
+
+def cancel_order(order_id, reason, by):
+    """Cancela o pedido guardando o motivo e quem cancelou (loja ou cliente)."""
+    db = get_db()
+    db.execute("UPDATE orders SET status = 'cancelado', cancel_reason = ?, cancelled_by = ?, "
+               "cancelled_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND status != 'cancelado'",
+               (reason[:120], by, order_id))
+    db.commit()
+
+
+def customer_can_cancel(order):
+    """O cliente só cancela sozinho antes da loja confirmar e se não pagou pelo site."""
+    return order["status"] in ("aguardando_pagamento", "novo") and order["payment_status"] != "pago"
 
 
 def expire_if_needed(order):

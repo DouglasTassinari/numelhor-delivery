@@ -9,13 +9,15 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 
 from . import geo, hours
 from .db import audit, get_db, settings
-from .orders import (METHOD_LABELS, PAYMENT_LABELS, STATUS_LABELS, apply_payment, brl, expire_if_needed,
-                     get_items, get_order, mark_paid, refresh_payment, store_message, wa_link)
+from .orders import (METHOD_LABELS, PAYMENT_LABELS, STATUS_LABELS, apply_payment, brl, cancel_order,
+                     customer_can_cancel, expire_if_needed, get_items, get_order, mark_paid, refresh_payment,
+                     store_message, wa_link)
 from .payments import PaymentError, provider
 from .pricing import CartError, price_cart, product_groups
 from .security import json_error, rate_limited
 
 bp = Blueprint("public", __name__)
+STARTED_AT = datetime.now(hours.BRT).strftime("%d/%m/%Y %H:%M")
 
 ONLINE_METHODS = {"pix", "cartao"}
 OFFLINE_METHODS = {"dinheiro", "pix", "debito", "credito"}
@@ -186,7 +188,7 @@ def manifest():
 @bp.get("/saude")
 def health():
     get_db().execute("SELECT 1").fetchone()
-    return {"ok": True}
+    return {"ok": True, "ligado_desde": STARTED_AT}
 
 
 @bp.get("/checkout")
@@ -429,8 +431,17 @@ def order_page(token):
     if request.args.get("payment_id") or request.args.get("collection_id"):
         order = refresh_payment(order, min_interval=0)
     return render_template("pedido.html", order=order, items=get_items(order["id"]),
+                           can_cancel=customer_can_cancel(order),
                            state=order_state(order), method_labels=METHOD_LABELS,
                            simulation=provider().is_simulation, **store_context())
+
+
+@bp.post("/pedido/<token>/cancelar")
+def customer_cancel(token):
+    order = _load(token)
+    if customer_can_cancel(order):
+        cancel_order(order["id"], "Cancelado pelo cliente", "cliente")
+    return redirect(url_for("public.order_page", token=token))
 
 
 @bp.get("/api/pedido/<token>")

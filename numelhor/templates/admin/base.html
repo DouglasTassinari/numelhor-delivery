@@ -48,6 +48,8 @@
   </header>
   <nav class="admin-nav" aria-label="Painel">
     <a href="{{ url_for('admin.orders') }}" class="{{ 'on' if active == 'pedidos' }}">📋 Pedidos</a>
+    <a href="{{ url_for('admin.cash_page') }}" class="{{ 'on' if active == 'caixa' }}">💰 Caixa{% if cash_open %} <span class="dot-on" title="Caixa aberto"></span>{% endif %}</a>
+    <a href="{{ url_for('admin.reports_page') }}" class="{{ 'on' if active == 'relatorios' }}">📊 Relatórios</a>
     <a href="{{ url_for('admin.products') }}" class="{{ 'on' if active == 'cardapio' }}">🍔 Cardápio</a>
     <a href="{{ url_for('admin.extras') }}" class="{{ 'on' if active == 'extras' }}">🥫 Categorias e molhos</a>
     <a href="{{ url_for('admin.payments_page') }}" class="{{ 'on' if active == 'pagamentos' }}">💳 Pagamentos</a>
@@ -56,6 +58,11 @@
     <a href="{{ url_for('public.index') }}" class="site" target="_blank" rel="noopener">Ver site ↗</a>
   </nav>
   <div class="sound-banner" id="sound-banner" role="button" tabindex="0" hidden>🔔 O navegador pausou o som dos pedidos. <strong>Clique aqui (ou em qualquer lugar da tela)</strong> para ligar de novo.</div>
+  {% if cash_open and not store_open and active != 'caixa' %}
+  <a class="cash-banner" href="{{ url_for('admin.cash_page') }}">💰 A loja está fechada e o <strong>caixa continua aberto</strong>. Clique aqui para fechar o caixa e conferir o dia →</a>
+  {% elif store_open and not cash_open and active == 'pedidos' %}
+  <a class="cash-banner info" href="{{ url_for('admin.cash_page') }}">💰 O caixa ainda não foi aberto hoje. <strong>Clique aqui para abrir o caixa</strong> (informe o troco da gaveta) →</a>
+  {% endif %}
   <main class="container admin-main">
     {% with messages = get_flashed_messages() %}
       {% for m in messages %}<div class="alert alert-ok flash">{{ m }}</div>{% endfor %}

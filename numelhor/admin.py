@@ -4,6 +4,7 @@ import os
 import re
 import secrets
 import time
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request, session,
@@ -13,7 +14,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import hours
 from .db import DEFAULT_SETTINGS, WEEKDAYS, audit, get_db, set_settings, settings
-from .orders import (ACTION_LABELS, METHOD_LABELS, PAYMENT_LABELS, STATUS_LABELS, allowed_actions, brl,
+from . import cash
+from .orders import (ACTION_LABELS, METHOD_LABELS, PAYMENT_LABELS, STATUS_LABELS, allowed_actions, brl, cancel_order,
                      courier_message, customer_message, expire_if_needed, get_items, get_order, maps_link,
                      set_status, wa_link)
 from . import secretbox
@@ -35,7 +37,11 @@ CATEGORY_ICONS = {"xis": "Xis", "burger": "Hambúrguer", "pastel": "Pastel", "ba
 @bp.context_processor
 def inject_store_state():
     status = hours.store_status(settings())
-    return {"store_open": status["open"], "store_status": status}
+    try:
+        cash_open = cash.current_session() is not None
+    except Exception:  # noqa: BLE001 - tela de login antes do banco existir
+        cash_open = False
+    return {"store_open": status["open"], "store_status": status, "cash_open": cash_open}
 
 
 def password_problem(password, username):
@@ -209,6 +215,8 @@ def api_orders():
             "total": brl(o["total_cents"]), "fulfillment": o["fulfillment"],
             "payment": f"{METHOD_LABELS[o['pay_method']]} · {PAYMENT_LABELS[o['payment_status']]}",
             "paid": o["payment_status"] == "pago",
+            "cancelled_by": o["cancelled_by"],
+            "print_url": url_for("admin.order_print", order_id=o["id"]),
             "url": url_for("admin.order_detail", order_id=o["id"]),
         })
     return jsonify({"ok": True, "orders": out, "store_open": hours.store_status(settings())["open"]})
@@ -236,7 +244,8 @@ def order_detail(order_id):
         customer_wa=wa_link(order["customer_phone"], customer_message(order)),
         courier_wa=("https://wa.me/?text=" + quote(courier_message(order, items))
                     if order["fulfillment"] == "entrega" else None),
-        pix_charge=pix_charge,
+        pix_charge=pix_charge, cancel_reasons=cash.CANCEL_REASONS, created=cash.local_label(order["created_at"]),
+        can_cancel="cancelado" in allowed_actions(order),
     )
 
 
@@ -250,11 +259,39 @@ def order_status(order_id):
     if new not in allowed_actions(order):
         flash("Essa mudança de status não é permitida.")
         return redirect(url_for("admin.order_detail", order_id=order_id))
+    if new == "cancelado":
+        reason = request.form.get("cancel_reason", "")
+        if reason not in cash.CANCEL_REASONS:
+            flash("Escolha o motivo do cancelamento.")
+            return redirect(url_for("admin.order_detail", order_id=order_id))
+        note = request.form.get("cancel_note", "").strip()[:80]
+        cancel_order(order_id, f"{reason}: {note}" if note else reason, "loja")
+        audit("pedido_cancelado", f"pedido {order_id} ({brl(order['total_cents'])}): {reason} {note}")
+        flash(f"Pedido #{order_id} cancelado. Ele não entra no caixa.")
+        return redirect(url_for("admin.order_detail", order_id=order_id))
     payment = "recebido" if new == "concluido" and order["payment_status"] == "na_entrega" else None
     set_status(order_id, new, payment)
     audit("pedido_status", f"pedido {order_id}: {order['status']} -> {new}")
     flash(f"Pedido #{order_id}: {STATUS_LABELS[new]}.")
-    return redirect(url_for("admin.order_detail", order_id=order_id))
+    target = url_for("admin.order_detail", order_id=order_id)
+    if new == "confirmado":
+        target += "?imprimir=1"  # a tela do pedido abre a impressão sozinha
+    return redirect(target)
+
+
+@bp.get("/pedidos/<int:order_id>/imprimir")
+@login_required
+def order_print(order_id):
+    order = get_order(order_id)
+    if not order:
+        abort(404)
+    items = get_items(order_id)
+    maps_url = maps_link(order)
+    return render_template(
+        "admin/imprimir.html", order=order, items=items, cfg=settings(),
+        status_label=STATUS_LABELS[order["status"]], method_label=METHOD_LABELS[order["pay_method"]],
+        created=cash.local_label(order["created_at"]), maps_qr=qr_png_b64(maps_url) if maps_url else None,
+        paper=request.args.get("papel", "80"))
 
 
 @bp.post("/loja/modo")
@@ -263,10 +300,21 @@ def store_mode():
     mode = request.form.get("mode")
     if mode not in ("auto", "aberto", "fechado"):
         abort(400)
-    set_settings({"open_mode": mode})
-    audit("loja_modo", mode)
-    flash({"auto": "Loja seguindo o horário automático.", "aberto": "Loja ABERTA agora (fora do horário).",
-           "fechado": "Loja FECHADA agora. Os clientes não conseguem pedir."}[mode])
+    cfg = settings()
+    now = datetime.now(hours.BRT)
+    until = None
+    if mode == "aberto":
+        until = hours.next_closing_at(cfg, now)
+    elif mode == "fechado":
+        until = hours.next_opening_at(cfg, now)
+    set_settings({"open_mode": mode, "open_until": str(int(until.timestamp())) if until else ""})
+    audit("loja_modo", f"{mode} até {until:%d/%m %H:%M}" if until else mode)
+    when = f"{until:%H:%M}" if until else ""
+    flash({"auto": "Loja seguindo o horário normal.",
+           "aberto": f"Loja ABERTA agora. Fecha sozinha às {when} e volta ao horário normal." if until else
+                     "Loja ABERTA agora.",
+           "fechado": f"Loja FECHADA agora. Abre sozinha no próximo horário ({until:%d/%m} às {when})." if until else
+                      "Loja FECHADA agora. Os clientes não conseguem pedir."}[mode])
     return redirect(safe_next(request.form.get("back"), url_for("admin.orders")))
 
 
@@ -518,6 +566,72 @@ def extras():
     return render_template("admin/extras.html", active="extras", icons=CATEGORY_ICONS,
                            cats=db.execute("SELECT * FROM categories ORDER BY sort, id").fetchall(),
                            sauces=db.execute("SELECT * FROM sauces ORDER BY sort, id").fetchall())
+
+
+# ---------- Caixa ----------
+
+@bp.route("/caixa", methods=["GET", "POST"])
+@login_required
+def cash_page():
+    user = g.admin["username"]
+    session_row = cash.current_session()
+    if request.method == "POST":
+        action = request.form.get("action")
+        amount = parse_money(request.form.get("amount") or "0")
+        if amount is None:
+            flash("Valor inválido. Exemplo: 150,00")
+            return redirect(url_for("admin.cash_page"))
+        if action == "abrir":
+            if session_row:
+                flash("O caixa já está aberto.")
+            else:
+                cash.open_session(amount, user)
+                flash(f"Caixa aberto com {brl(amount)} de troco na gaveta. Bom trabalho!")
+        elif action in ("sangria", "suprimento") and session_row:
+            reason = request.form.get("reason", "").strip()[:80]
+            if amount <= 0:
+                flash("Informe um valor maior que zero.")
+            else:
+                cash.add_move(session_row["id"], action, amount, reason, user)
+                flash(("Retirada" if action == "sangria" else "Reforço") + f" de {brl(amount)} registrada.")
+        elif action == "fechar" and session_row:
+            notes = request.form.get("notes", "").strip()[:300]
+            cash.close_session(session_row, amount, notes, user)
+            flash("Caixa fechado. Confira o relatório abaixo e imprima se quiser.")
+            return redirect(url_for("admin.cash_session_page", session_id=session_row["id"]))
+        else:
+            abort(400)
+        return redirect(url_for("admin.cash_page"))
+    report = cash.session_report(session_row) if session_row else None
+    recent = get_db().execute("SELECT * FROM cash_sessions WHERE closed_at IS NOT NULL ORDER BY id DESC LIMIT 10").fetchall()
+    return render_template("admin/caixa.html", active="caixa", session=session_row, report=report, recent=recent,
+                           local=cash.local_label, methods=cash.METHODS)
+
+
+@bp.get("/caixa/<int:session_id>")
+@login_required
+def cash_session_page(session_id):
+    row = get_db().execute("SELECT * FROM cash_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        abort(404)
+    report = cash.session_report(row)
+    return render_template("admin/caixa_fechamento.html", active="caixa", session=row, report=report,
+                           local=cash.local_label, methods=cash.METHODS, cfg=settings())
+
+
+# ---------- Relatórios ----------
+
+@bp.get("/relatorios")
+@login_required
+def reports_page():
+    key = request.args.get("periodo", "hoje")
+    start, end, title = cash.period_range(key, request.args.get("de"), request.args.get("ate"))
+    summary = cash.summarize(start, end, by_day=(end - start).days > 1)
+    sessions = cash.sessions_between(start, end)
+    return render_template("admin/relatorios.html", active="relatorios", periods=cash.PERIODS, key=key,
+                           title=title, summary=summary, sessions=sessions, local=cash.local_label,
+                           methods=cash.METHODS, de=request.args.get("de") or f"{start:%Y-%m-%d}",
+                           ate=request.args.get("ate") or f"{end - timedelta(days=1):%Y-%m-%d}")
 
 
 # ---------- Configurações ----------

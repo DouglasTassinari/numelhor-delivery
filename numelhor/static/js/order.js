@@ -10,6 +10,10 @@
   const payment = root.dataset.payment;
   const finished = status === "concluido" || status === "cancelado";
 
+  document.querySelectorAll("form[data-confirm]").forEach((f) => {
+    f.addEventListener("submit", (e) => { if (!confirm(f.dataset.confirm)) e.preventDefault(); });
+  });
+
   document.querySelectorAll("[data-copy]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const input = $(btn.dataset.copy);

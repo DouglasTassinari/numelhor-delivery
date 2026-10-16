@@ -1,0 +1,73 @@
+{% extends "admin/base.html" %}
+{% from "admin/_cash_macros.html" import kpis, methods_table, split, top_products, hours_chart, days_chart, reasons %}
+{% block title %}Relatórios{% endblock %}
+{% block content %}
+<div class="head-row no-print">
+  <h1>📊 Relatórios</h1>
+  <button type="button" class="btn btn-ghost btn-sm" data-window-print>🖨️ Imprimir</button>
+</div>
+
+<form method="get" class="panel period-form no-print">
+  <div class="period-chips">
+    {% for k, label in periods if k != "custom" %}
+    <a class="chip {{ 'active' if key == k }}" href="?periodo={{ k }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <div class="period-custom">
+    <input type="hidden" name="periodo" value="custom">
+    <label>De <input type="date" name="de" value="{{ de }}"></label>
+    <label>Até <input type="date" name="ate" value="{{ ate }}"></label>
+    <button class="btn btn-dark btn-sm" type="submit">Ver período</button>
+  </div>
+</form>
+
+<div class="report">
+  <h2 class="report-title">{{ title }}</h2>
+  <section class="panel">{{ kpis(summary) }}
+    {% if summary.waiting_count %}<p class="hint" style="margin-top:10px">⏳ {{ summary.waiting_count }} pedido(s) aguardando pagamento online não entram nas vendas.</p>{% endif %}
+  </section>
+
+  <div class="order-grid">
+    <section class="panel"><h2>Por forma de pagamento</h2>{{ methods_table(summary, methods) }}</section>
+    <section class="panel"><h2>Entrega x retirada</h2>{{ split(summary) }}
+      <h3 class="sub-title">Valor dos produtos x taxas</h3>
+      <table class="list money"><tbody>
+        <tr><td>Produtos</td><td>{{ summary.products|brl }}</td></tr>
+        <tr><td>Taxas de entrega</td><td>{{ summary.fees|brl }}</td></tr>
+      </tbody></table>
+    </section>
+  </div>
+
+  {% if summary.days %}
+  <section class="panel"><h2>Dia a dia</h2>{{ days_chart(summary) }}</section>
+  {% endif %}
+
+  <div class="order-grid">
+    <section class="panel"><h2>Mais vendidos</h2>{{ top_products(summary) }}</section>
+    <section class="panel"><h2>Horários de mais movimento</h2>{{ hours_chart(summary) }}</section>
+  </div>
+
+  <div class="order-grid">
+    <section class="panel"><h2>Cancelamentos</h2>{{ reasons(summary) }}</section>
+    <section class="panel">
+      <h2>Fechamentos de caixa</h2>
+      {% if sessions %}
+      <table class="list money">
+        <thead><tr><th>Abertura</th><th>Vendas</th><th>Diferença</th><th class="no-print"></th></tr></thead>
+        <tbody>
+        {% for r in sessions %}
+          {% set diff = (r.counted_cents or 0) - (r.expected_cents or 0) %}
+          <tr>
+            <td>{{ local(r.opened_at) }}{% if not r.closed_at %} <span class="badge yellow">aberto</span>{% endif %}</td>
+            <td>{{ ((r.summary|fromjson).gross if r.summary else 0)|brl }}</td>
+            <td class="{{ 'neg' if diff < 0 else ('pos' if diff > 0 else '') }}">{{ diff|brl if r.closed_at else "—" }}</td>
+            <td class="no-print"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.cash_session_page', session_id=r.id) }}">Ver</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">Nenhum caixa aberto neste período.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

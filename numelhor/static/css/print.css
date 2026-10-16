@@ -1,0 +1,33 @@
+/* Comanda para impressora térmica (80 mm / 58 mm) ou folha A4 */
+* { box-sizing: border-box; }
+body { margin: 0; background: #eee; color: #000; font: 13px/1.35 "Courier New", ui-monospace, monospace; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; background: #140d0b; color: #fff; font-family: system-ui, sans-serif; font-size: 15px; }
+.toolbar button { font: inherit; font-weight: 800; padding: 10px 16px; border: 0; border-radius: 10px; background: #ffc20e; cursor: pointer; }
+.toolbar a { color: #fff; padding: 8px 10px; border-radius: 8px; text-decoration: none; border: 1px solid #555; }
+.toolbar a.on { background: #fff; color: #000; }
+.ticket { background: #fff; margin: 12px auto; padding: 10px 8px; }
+.paper-80 .ticket { width: 80mm; }
+.paper-58 .ticket { width: 58mm; font-size: 11px; }
+.paper-a4 .ticket { width: 160mm; font-size: 15px; padding: 16px; }
+.center { text-align: center; }
+.store { font-weight: 900; font-size: 1.3em; }
+.big { font-weight: 900; font-size: 1.45em; }
+.small { font-size: .85em; }
+.tag { font-weight: 900; margin: 4px 0; padding: 2px 4px; border: 2px solid #000; }
+.tag.inverse { background: #000; color: #fff; }
+.sep { border-top: 1px dashed #000; margin: 6px 0; }
+.row { display: flex; justify-content: space-between; gap: 8px; }
+.item { margin: 4px 0 6px; }
+.sub { padding-left: 10px; }
+.sem { font-weight: 900; }
+.qr { text-align: center; margin: 6px 0; }
+.qr img { width: 32mm; height: 32mm; image-rendering: pixelated; display: block; margin: 0 auto; }
+.paper-58 .qr img { width: 26mm; height: 26mm; }
+
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .ticket { margin: 0; padding: 0 2mm; }
+  .paper-80 .ticket, .paper-58 .ticket { width: 100%; }
+}
+@page { margin: 2mm; }

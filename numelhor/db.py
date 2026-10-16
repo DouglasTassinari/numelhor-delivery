@@ -16,6 +16,8 @@ DEFAULT_SETTINGS = {
     "store_lng": "-49.411353",
     # auto = segue o horário; aberto/fechado = o dono forçou pelo painel
     "open_mode": "auto",
+    # Até quando vale o "Abrir agora"/"Fechar agora" (segundos desde 1970); vazio = sem prazo
+    "open_until": "",
     # Horário por dia da semana (0 = segunda). Vazio = fechado. Pode passar da meia-noite (18:00-01:00).
     "hours_0": "",
     "hours_1": "18:00-23:30",
@@ -110,6 +112,9 @@ def _migrate(db):
         db.execute("ALTER TABLE products ADD COLUMN featured INTEGER NOT NULL DEFAULT 0")
     if "old_price_cents" not in columns("products"):
         db.execute("ALTER TABLE products ADD COLUMN old_price_cents INTEGER")
+    for col in ("cancel_reason", "cancelled_at", "cancelled_by"):
+        if col not in columns("orders"):
+            db.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT")  # nosec B608 - nomes fixos
     if "options" not in columns("order_items"):
         db.execute("ALTER TABLE order_items ADD COLUMN options TEXT NOT NULL DEFAULT '[]'")
     old = db.execute("SELECT value FROM settings WHERE key = 'store_open'").fetchone()
