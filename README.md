@@ -55,7 +55,7 @@ Para voltar ao cardápio padrão da loja (os pedidos antigos são mantidos), use
 
 1. Suba este repositório no GitHub como **privado**.
 2. No [Render](https://render.com), escolha **New → Blueprint** e aponte para o repositório. O arquivo `render.yaml` já configura tudo.
-3. Preencha no Render `ADMIN_PASSWORD`: a senha inicial do painel, com 12 ou mais caracteres. Ela é trocada no 1º acesso. O endereço do site é detectado sozinho. Se usar domínio próprio, defina `PUBLIC_BASE_URL`.
+3. Preencha no Render `ADMIN_PASSWORD`: a senha do painel (10+ caracteres, misturando maiúsculas, minúsculas e números). Para trocá-la depois, altere esse valor no Render: o site reinicia com a senha nova. O endereço do site é detectado sozinho. Se usar domínio próprio, defina `PUBLIC_BASE_URL`.
 4. Acesse `/admin`, entre com `dono` e a senha inicial, crie a senha definitiva e ative o 2FA em **Segurança**.
 
 > No plano grátis do Render os dados (pedidos e configurações) **são apagados a cada reinício ou nova publicação**. Serve para demonstração. Para uso real, use um plano com disco permanente ou um servidor próprio, apontando `DATABASE_PATH` e `UPLOAD_DIR` para o disco, e faça backup diário.

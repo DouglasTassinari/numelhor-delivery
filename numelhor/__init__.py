@@ -15,7 +15,9 @@ from .orders import brl, group_options
 
 def _bootstrap_admin():
     """Na hospedagem: cria o primeiro usuário do painel a partir de ADMIN_USERNAME/ADMIN_PASSWORD (só se não existir
-    nenhum). A troca de senha continua obrigatória no primeiro acesso."""
+    nenhum). Como a senha foi escolhida pelo dono na hospedagem, não pede troca no primeiro acesso."""
+    from .admin import password_problem
+
     username = os.environ.get("ADMIN_USERNAME", "").strip().lower()
     password = os.environ.get("ADMIN_PASSWORD", "")
     if not username or not password:
@@ -23,9 +25,10 @@ def _bootstrap_admin():
     conn = db.get_db()
     if conn.execute("SELECT COUNT(*) FROM admin_users").fetchone()[0]:
         return
-    if len(password) < 12:
-        raise RuntimeError("ADMIN_PASSWORD precisa ter pelo menos 12 caracteres")
-    conn.execute("INSERT INTO admin_users (username, password_hash, must_change_password) VALUES (?, ?, 1)",
+    problem = password_problem(password, username)
+    if problem:
+        raise RuntimeError(f"ADMIN_PASSWORD fraca: {problem}")
+    conn.execute("INSERT INTO admin_users (username, password_hash, must_change_password) VALUES (?, ?, 0)",
                  (username, generate_password_hash(password)))
     conn.commit()
     db.audit("admin_criado_pela_hospedagem", username, actor="sistema")
