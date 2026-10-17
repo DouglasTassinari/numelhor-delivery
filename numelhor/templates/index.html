@@ -12,10 +12,10 @@
 <section class="banner">
   <div class="container banner-inner">
     <div>
-      <h1>Que lanche <span class="y">brabo!</span></h1>
-      <p>Xis, hambúrguer e pastel em {{ cfg.store_city.split(' - ')[0].split(',')[0] }}. Monte do seu jeito e peça por aqui.</p>
+      <h1>Que lanche <span class="y">brabo!</span><span class="h1-sub">Xis, hambúrguer e pastel em {{ cfg.store_city.split(' - ')[0].split(',')[0] }}</span></h1>
+      <p>{% if bairro %}Lanchonete no {{ bairro }}. {% endif %}Monte do seu jeito e peça por aqui, para entrega ou retirada.</p>
     </div>
-    <img src="{{ url_for('static', filename='img/mascote.webp') }}" alt="" width="240" height="240">
+    <img src="{{ url_for('static', filename='img/mascote.webp') }}" alt="" width="240" height="240" fetchpriority="high">
   </div>
 </section>
 
@@ -53,7 +53,7 @@
     <div class="featured">
       {% for p in menu.featured %}
       <button class="feat" type="button" data-product="{{ p.id }}">
-        <div class="thumb">{% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy">{% else %}<span class="emoji">{{ cat_emoji(p.icon) }}</span>{% endif %}</div>
+        <div class="thumb">{% if p.image %}<img src="{{ p.image }}" alt="{{ p.name }}" width="200" height="200" loading="lazy" decoding="async">{% else %}<span class="emoji">{{ cat_emoji(p.icon) }}</span>{% endif %}</div>
         {% if p.old_price_cents %}<span class="tag-promo">PROMOÇÃO</span>{% endif %}
         <h3>{{ p.name }}</h3>
         {{ product_price(p) }}
@@ -77,7 +77,7 @@
           <span class="add-pill">+ Adicionar</span>
         </div>
         <div class="thumb">
-          {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy">{% else %}<span class="emoji">{{ cat_emoji(c.icon) }}</span>{% endif %}
+          {% if p.image %}<img src="{{ p.image }}" alt="{{ p.name }}" width="200" height="200" loading="lazy" decoding="async">{% else %}<span class="emoji">{{ cat_emoji(c.icon) }}</span>{% endif %}
         </div>
       </button>
       {% endfor %}
@@ -85,6 +85,40 @@
   </section>
   {% endfor %}
   <p class="no-results" id="no-results" hidden>Não achamos nada com esse nome. 🤔<br>Tente outra palavra ou chame a gente no WhatsApp.</p>
+</div>
+
+<div class="container">
+  <section class="about" id="sobre" aria-labelledby="sobre-titulo">
+    <h2 id="sobre-titulo">{{ cfg.store_name }}{% if bairro %} no {{ bairro }}{% endif %}, {{ cfg.store_city.split(' - ')[0].split(',')[0] }}</h2>
+    <p>A {{ cfg.store_name }} faz xis, hambúrguer, pastel salgado e doce, porções e combos{% if bairro %} no bairro {{ bairro }}{% endif %}, em {{ cfg.store_city.split(' - ')[0].split(',')[0] }}. Você escolhe o lanche, tira o que não gosta, coloca adicionais e pede por aqui mesmo: com entrega até {{ cfg.delivery_max_km }} km da loja ou retirada no balcão, sem taxa.</p>
+    <div class="about-grid">
+      <div class="about-card">
+        <h3>🕒 Horário</h3>
+        <div class="info-list">
+          {% for day, text in hours_week %}<div class="{{ 'today' if loop.index0 == today_idx }}"><span>{{ day }}</span><span>{{ text }}</span></div>{% endfor %}
+        </div>
+      </div>
+      <div class="about-card">
+        <h3>📍 Endereço</h3>
+        <address>{{ cfg.store_address }}<br>{{ cfg.store_city }}</address>
+        <p><a href="{{ map_url }}" target="_blank" rel="noopener">Ver no mapa e traçar rota</a></p>
+        <h3>🛵 Entrega e retirada</h3>
+        <p>Entrega em {{ cfg.delivery_eta }}, até {{ cfg.delivery_max_km }} km. Retirada pronta em {{ cfg.pickup_eta }}.</p>
+        <h3>💳 Pagamento</h3>
+        <p>Pix ou cartão pelo site. Dinheiro, Pix, débito ou crédito na entrega ou na retirada.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq" id="perguntas" aria-labelledby="perguntas-titulo">
+    <h2 id="perguntas-titulo">Perguntas frequentes</h2>
+    {% for q, a in faq %}
+    <details class="faq-item"{% if loop.first %} open{% endif %}>
+      <summary>{{ q }}</summary>
+      <p>{{ a }}</p>
+    </details>
+    {% endfor %}
+  </section>
 </div>
 
 <div class="bottom-bar">

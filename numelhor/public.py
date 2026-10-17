@@ -71,8 +71,59 @@ def store_context():
     }
 
 
-def structured_data(menu, cfg):
-    """Dados para o Google (schema.org/Restaurant): endereço, horário, telefone e cardápio com preços."""
+def store_city(cfg):
+    """'Criciúma - SC, 88817-000' -> 'Criciúma'."""
+    return cfg["store_city"].split(" - ")[0].split(",")[0].strip()
+
+
+def store_neighborhood(cfg):
+    """'Av. Luiz Lazzarin, 155 - 2º andar - Rio Maina' -> 'Rio Maina' (último trecho do endereço)."""
+    parts = [p.strip() for p in cfg["store_address"].split(" - ")]
+    return parts[-1] if len(parts) > 1 else ""
+
+
+def map_url(cfg):
+    return f"https://www.google.com/maps/search/?api=1&query={cfg['store_lat']},{cfg['store_lng']}"
+
+
+def faq_items(cfg, hours_summary):
+    """Perguntas frequentes (mostradas na página e enviadas ao Google), montadas a partir das configurações."""
+    per_km = int(cfg["delivery_per_km_cents"] or 0)
+    fee = f"{brl(int(cfg['delivery_base_cents']))} até {cfg['delivery_included_km']} km"
+    if per_km:
+        fee += f", mais {brl(per_km)} por km a mais"
+    name, city = cfg["store_name"], store_city(cfg)
+    return [
+        (f"Qual o horário de funcionamento da {name}?",
+         f"{hours_summary}. Fora desse horário você pode olhar o cardápio, e os pedidos abrem no nosso horário."),
+        (f"A {name} faz entrega em {city}?",
+         f"Faz. Entregamos até {cfg['delivery_max_km']} km da loja, em média em {cfg['delivery_eta']}. "
+         f"A taxa é de {fee}, e o valor certinho aparece quando você marca o endereço no mapa."),
+        ("Posso retirar o pedido no balcão?",
+         f"Pode. A retirada não tem taxa e o pedido fica pronto em {cfg['pickup_eta']}. "
+         f"O endereço é {cfg['store_address']}, {cfg['store_city']}."),
+        ("Quais são as formas de pagamento?",
+         "Pelo site: Pix ou cartão. Na entrega ou na retirada: dinheiro, Pix, débito ou crédito."),
+        ("Dá para montar o lanche do meu jeito?",
+         "Dá. Ao escolher o lanche, você pode tirar ingredientes, colocar adicionais e escolher os molhos."),
+        ("Como faço o pedido pelo site?",
+         "Escolha os lanches no cardápio, toque em Ver sacola e finalize o pedido. "
+         "Depois é só acompanhar o andamento em Meus pedidos."),
+    ]
+
+
+def _clean(value):
+    """Tira campos vazios (None, '' e listas vazias) do JSON-LD."""
+    if isinstance(value, dict):
+        return {k: _clean(v) for k, v in value.items() if v not in (None, "", [], {})}
+    if isinstance(value, list):
+        return [_clean(v) for v in value]
+    return value
+
+
+def structured_data(menu, cfg, faq):
+    """Dados para o Google (schema.org): restaurante com endereço, horário, área de entrega e
+    cardápio com preços, o site e as perguntas frequentes."""
     base = current_app.config["PUBLIC_BASE_URL"]
     city_raw = cfg["store_city"]
     postal = re.search(r"\d{5}-?\d{3}", city_raw)
@@ -85,30 +136,51 @@ def structured_data(menu, cfg):
             opening.append({"@type": "OpeningHoursSpecification", "dayOfWeek": f"https://schema.org/{day}",
                             "opens": cfg[f"hours_{i}"][:5], "closes": cfg[f"hours_{i}"][6:]})
     phone = re.sub(r"\D", "", cfg["store_whatsapp"])
-    data = {
-        "@context": "https://schema.org",
+    city, bairro = store_city(cfg), store_neighborhood(cfg)
+    geo_point = {"@type": "GeoCoordinates", "latitude": float(cfg["store_lat"]), "longitude": float(cfg["store_lng"])}
+    photos = [base + p["image"] for c in menu["categories"] for p in c["products"] if p["image"]][:5]
+    restaurant = {
         "@type": "Restaurant",
+        "@id": base + "/#restaurante",
         "name": cfg["store_name"],
+        "description": (f"Lanchonete {'no ' + bairro + ', ' if bairro else ''}em {city}: xis, hambúrguer, "
+                        "pastel e porções. Peça pelo site para entrega ou retirada no balcão."),
         "url": base + "/",
-        "image": [base + url_for("static", filename="img/og-image.jpg")],
+        "image": [base + url_for("static", filename="img/og-image.jpg")] + photos,
         "logo": base + url_for("static", filename="img/icon-512.png"),
         "telephone": f"+{phone}" if phone else None,
         "priceRange": "$",
         "servesCuisine": ["Lanches", "Xis", "Hambúrguer", "Pastel"],
         "acceptsReservations": False,
+        "paymentAccepted": "Dinheiro, Pix, Cartão de débito, Cartão de crédito",
+        "currenciesAccepted": "BRL",
         "address": {
             "@type": "PostalAddress",
             "streetAddress": cfg["store_address"],
-            "addressLocality": city_raw.split(" - ")[0].split(",")[0].strip(),
+            "addressLocality": city,
             "addressRegion": region.group(1) if region else None,
             "postalCode": postal.group(0) if postal else None,
             "addressCountry": "BR",
         },
-        "geo": {"@type": "GeoCoordinates", "latitude": float(cfg["store_lat"]), "longitude": float(cfg["store_lng"])},
+        "geo": geo_point,
+        "hasMap": map_url(cfg),
+        "areaServed": {"@type": "GeoCircle", "geoMidpoint": geo_point,
+                       "geoRadius": int(float(cfg["delivery_max_km"]) * 1000)},
         "openingHoursSpecification": opening,
         "sameAs": [f"https://www.instagram.com/{cfg['store_instagram']}/"] if cfg["store_instagram"] else [],
+        "menu": base + "/#menu",
+        "potentialAction": {
+            "@type": "OrderAction",
+            "target": {"@type": "EntryPoint", "urlTemplate": base + "/", "inLanguage": "pt-BR",
+                       "actionPlatform": ["https://schema.org/DesktopWebPlatform",
+                                          "https://schema.org/MobileWebPlatform"]},
+            "deliveryMethod": ["http://purl.org/goodrelations/v1#DeliveryModeOwnFleet",
+                               "http://purl.org/goodrelations/v1#DeliveryModePickUp"],
+        },
         "hasMenu": {
             "@type": "Menu",
+            "url": base + "/#menu",
+            "inLanguage": "pt-BR",
             "hasMenuSection": [{
                 "@type": "MenuSection",
                 "name": c["name"],
@@ -116,19 +188,36 @@ def structured_data(menu, cfg):
                     "@type": "MenuItem",
                     "name": p["name"],
                     "description": p["description"] or None,
+                    "image": base + p["image"] if p["image"] else None,
                     "offers": {"@type": "Offer", "price": f"{p['from_cents'] / 100:.2f}", "priceCurrency": "BRL"},
                 } for p in c["products"]],
             } for c in menu["categories"]],
         },
     }
-    return data
+    website = {
+        "@type": "WebSite",
+        "@id": base + "/#site",
+        "url": base + "/",
+        "name": cfg["store_name"],
+        "inLanguage": "pt-BR",
+        "publisher": {"@id": base + "/#restaurante"},
+    }
+    faq_page = {
+        "@type": "FAQPage",
+        "@id": base + "/#perguntas",
+        "mainEntity": [{"@type": "Question", "name": q,
+                        "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in faq],
+    }
+    return _clean({"@context": "https://schema.org", "@graph": [restaurant, website, faq_page]})
 
 
 @bp.get("/")
 def index():
     menu = menu_data()
     ctx = store_context()
-    return render_template("index.html", menu=menu, ld_json=structured_data(menu, ctx["cfg"]), **ctx)
+    faq = faq_items(ctx["cfg"], ctx["hours_summary"])
+    return render_template("index.html", menu=menu, faq=faq, bairro=store_neighborhood(ctx["cfg"]),
+                           map_url=map_url(ctx["cfg"]), ld_json=structured_data(menu, ctx["cfg"], faq), **ctx)
 
 
 @bp.get("/privacidade")

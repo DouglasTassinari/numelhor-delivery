@@ -413,3 +413,18 @@ input::placeholder, textarea::placeholder { color: #a39383; }
   .kv { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .kv dd { margin-bottom: 8px; }
 }
+
+/* Subtítulo do H1 e seções "Sobre" e "Perguntas frequentes" (conteúdo para clientes e para o Google) */
+.banner h1 .h1-sub { display: block; margin-top: 6px; font-family: var(--body); font-weight: 900; font-size: clamp(1rem, 3.4vw, 1.3rem); letter-spacing: 0; text-shadow: none; }
+.about, .faq { padding: 26px 0 4px; }
+.about h2, .faq h2 { font-size: 1.7rem; margin-bottom: 10px; }
+.about > p { color: var(--muted); margin: 0 0 14px; max-width: 70ch; }
+.about-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 700px) { .about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.about-card { background: var(--surface); border: 2px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.about-card h3 { font-family: var(--body); font-weight: 900; font-size: 1.08rem; margin: 14px 0 4px; }
+.about-card h3:first-child { margin-top: 0; }
+.about-card p, .about-card address { margin: 0; font-style: normal; color: var(--muted); }
+.faq-item { background: var(--surface); border: 2px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 8px; }
+.faq-item summary { cursor: pointer; padding: 12px 16px; font-weight: 900; list-style-position: inside; }
+.faq-item p { margin: 0; padding: 0 16px 14px; color: var(--muted); }
