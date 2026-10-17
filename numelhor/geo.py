@@ -43,7 +43,8 @@ def delivery_quote(cfg, lat, lng):
         return {"ok": False, "distance_km": dist,
                 "error": f"Esse endereço fica a ~{dist:.1f} km e a gente entrega até {max_km:g} km. "
                          "Chama no WhatsApp que a gente vê!"}
-    extra_km = max(0.0, dist - float(cfg["delivery_included_km"]))
+    # round() tira o "resto" da conta com números quebrados (5,4 - 2,4 = 3,0000000000000004 viraria 4 km)
+    extra_km = max(0.0, round(dist - float(cfg["delivery_included_km"]), 6))
     fee = int(cfg["delivery_base_cents"]) + math.ceil(extra_km) * int(cfg["delivery_per_km_cents"])
     return {"ok": True, "distance_km": dist, "fee_cents": fee, "lat": coords[0], "lng": coords[1]}
 
