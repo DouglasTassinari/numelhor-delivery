@@ -1,0 +1,3 @@
+# Só para rodar os testes (o Render continua usando requirements.txt)
+-r requirements.txt
+pytest==9.1.1

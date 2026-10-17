@@ -42,6 +42,17 @@ copy .env.example .env      # preencha SECRET_KEY
 
 Para voltar ao cardápio padrão da loja (os pedidos antigos são mantidos), use `flask --app run recarregar-cardapio`.
 
+## Testes automáticos e monitoramento
+
+```bash
+.venv\Scripts\python -m pip install -r requirements-dev.txt
+.venv\Scripts\python -m pytest
+```
+
+- Os testes (pasta `tests/`) conferem preços, taxa de entrega, horários, criação de pedido, pagamentos em modo simulação, painel do dono, caixa, relatórios e as páginas públicas. Cada teste usa um banco novo e nenhum acessa a internet.
+- **No GitHub:** o workflow `testes` roda os testes a cada push e pull request (aba **Actions**).
+- **Monitor:** o workflow `monitor` confere a cada 30 minutos se `https://numelhor.onrender.com/saude` e a página inicial estão no ar. Se o site cair, o GitHub manda um e-mail. Para conferir na hora: aba **Actions → monitor → Run workflow**.
+
 ## Abrir pelo GitHub (Codespaces): jeito mais rápido para demonstrar
 
 1. No repositório, clique em **Code → aba Codespaces → Create codespace on main**.

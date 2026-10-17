@@ -1,0 +1,60 @@
+# Confere se o site publicado está no ar. Se falhar, o GitHub manda e-mail para o dono.
+# O plano grátis do Render "dorme" sem visitas e leva até ~1 minuto para acordar: por isso o tempo de espera
+# é longo (90 s) e cada conferência é repetida uma vez antes de dar falha.
+name: monitor
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # a cada 30 minutos (o GitHub às vezes atrasa um pouco)
+  workflow_dispatch:         # botão "Run workflow" para rodar na hora
+
+permissions:
+  actions: write   # para o último passo, que mantém este agendamento ligado
+  contents: read
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SITE: https://numelhor.onrender.com
+    steps:
+      - name: Conferir /saude (responde 200 com ok=true)
+        run: |
+          for tentativa in 1 2; do
+            codigo=$(curl -sS -o resposta.json -w '%{http_code}' --max-time 90 "$SITE/saude" || true)
+            if [ "$codigo" = "200" ] && jq -e '.ok == true' resposta.json > /dev/null 2>&1; then
+              echo "OK: $SITE/saude respondeu $(cat resposta.json)"
+              exit 0
+            fi
+            echo "::warning::Tentativa $tentativa: $SITE/saude respondeu HTTP $codigo"
+            if [ "$tentativa" = 1 ]; then sleep 30; fi
+          done
+          echo "::error::O site não respondeu /saude com ok=true depois de 2 tentativas."
+          exit 1
+
+      - name: Conferir a página inicial (responde 200 e mostra "NuMelhor")
+        run: |
+          for tentativa in 1 2; do
+            codigo=$(curl -sS -o pagina.html -w '%{http_code}' --max-time 90 "$SITE/" || true)
+            if [ "$codigo" = "200" ] && grep -q "NuMelhor" pagina.html; then
+              echo "OK: página inicial no ar ($(wc -c < pagina.html) bytes)"
+              exit 0
+            fi
+            echo "::warning::Tentativa $tentativa: a página inicial respondeu HTTP $codigo"
+            if [ "$tentativa" = 1 ]; then sleep 30; fi
+          done
+          echo "::error::A página inicial não abriu ou não mostra \"NuMelhor\" depois de 2 tentativas."
+          exit 1
+
+      # O GitHub desliga agendamentos de repositórios sem commits há 60 dias. Reativar o próprio monitor
+      # a cada execução zera essa contagem.
+      - name: Manter o agendamento ligado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/monitor.yml/enable"
