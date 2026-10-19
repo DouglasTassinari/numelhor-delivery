@@ -3,10 +3,16 @@
 # é longo (90 s) e cada conferência é repetida uma vez antes de dar falha.
 name: monitor
 
+# Só no horário da loja, de 1 hora antes de abrir até 1 hora depois de fechar, a cada 2 horas:
+# de terça a domingo às 17h, 19h, 21h e 23h de Brasília (segunda é folga). O GitHub usa o horário UTC
+# (Brasília + 3 h), então as conferências das 21h e das 23h já caem no dia seguinte em UTC.
+# Roda aos 5 minutos da hora porque na hora cheia o GitHub fica sobrecarregado e às vezes pula execuções.
+# Se o horário da loja mudar no painel, ajuste aqui também.
 on:
   schedule:
-    - cron: "*/30 * * * *"  # a cada 30 minutos (o GitHub às vezes atrasa um pouco)
-  workflow_dispatch:         # botão "Run workflow" para rodar na hora
+    - cron: "5 20,22 * * 0,2-6"  # 17h05 e 19h05 de Brasília, de terça a domingo
+    - cron: "5 0,2 * * 0,1,3-6"  # 21h05 e 23h05 de Brasília, de terça a domingo
+  workflow_dispatch:              # botão "Run workflow" para rodar na hora
 
 permissions:
   actions: write   # para o último passo, que mantém este agendamento ligado

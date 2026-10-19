@@ -51,7 +51,7 @@ Para voltar ao cardápio padrão da loja (os pedidos antigos são mantidos), use
 
 - Os testes (pasta `tests/`) conferem preços, taxa de entrega, horários, criação de pedido, pagamentos em modo simulação, painel do dono, caixa, relatórios e as páginas públicas. Cada teste usa um banco novo e nenhum acessa a internet.
 - **No GitHub:** o workflow `testes` roda os testes a cada push e pull request (aba **Actions**).
-- **Monitor:** o workflow `monitor` confere a cada 30 minutos se `https://numelhor.onrender.com/saude` e a página inicial estão no ar. Se o site cair, o GitHub manda um e-mail. Para conferir na hora: aba **Actions → monitor → Run workflow**.
+- **Monitor:** o workflow `monitor` confere se `https://numelhor.onrender.com/saude` e a página inicial estão no ar no horário da loja: de terça a domingo às 17h, 19h, 21h e 23h (de 1 hora antes de abrir até 1 hora depois de fechar). Se o horário da loja mudar, ajuste o agendamento em `.github/workflows/monitor.yml`. Se o site cair, o GitHub manda um e-mail. Para conferir na hora: aba **Actions → monitor → Run workflow**.
 
 ## Abrir pelo GitHub (Codespaces): jeito mais rápido para demonstrar
 
