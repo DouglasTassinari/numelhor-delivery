@@ -97,3 +97,10 @@ Sem conta conectada, o site fica em **modo simulação**, sem nenhum dinheiro re
 - Proteção contra formulários forjados (CSRF), cabeçalhos de segurança (CSP, HSTS, anti-iframe), limite de pedidos por aparelho e validação das fotos enviadas.
 - `.env` e `instance/` (banco, fotos enviadas) **não vão para o Git**.
 - Verificado com `bandit` (análise do código) e `pip-audit` (bibliotecas com falhas conhecidas): nenhum problema.
+
+
+---
+
+<p align="center">
+  <a href="https://douglastassinari.github.io/tazzin-site/"><img src="https://douglastassinari.github.io/tazzin-site/assets/img/selo-tazzin.svg" alt="Desenvolvido por TAZZIN" height="46"></a>
+</p>
