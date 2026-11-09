@@ -369,6 +369,8 @@ input::placeholder, textarea::placeholder { color: #a39383; }
 
 .footer { border-top: 1px solid var(--line); margin-top: 30px; padding: 22px 16px; text-align: center; color: var(--muted); font-size: .95rem; }
 .footer strong { color: var(--text); }
+.credit-tazzin { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: .9rem; }
+.credit-tazzin .tz { display: inline-flex; align-items: center; gap: 6px; color: var(--text); letter-spacing: .08em; text-decoration: none; }
 
 .legal h2 { font-size: 1.3rem; margin: 20px 0 8px; }
 .legal p, .legal li { line-height: 1.6; }
