@@ -71,7 +71,7 @@
 
       {% else %}
       <section class="panel success">
-        <img src="{{ url_for('static', filename='img/obrigado.webp') }}" alt="Du do NuMelhor mandando um beijo">
+        <img src="{{ url_for('static', filename='img/obrigado.webp') }}" alt="Obrigado pelo pedido!">
         <h2>Pedido recebido!</h2>
         <p class="muted">Agora manda pra loja no WhatsApp que a gente confirma rapidinho:</p>
         <a class="btn btn-wa btn-lg btn-block" id="wa-send" href="{{ state.whatsapp_url }}" target="_blank" rel="noopener">{{ wa_icon() }} Enviar pedido no WhatsApp</a>
